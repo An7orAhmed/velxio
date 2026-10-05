@@ -1,0 +1,30 @@
+{
+  "mcu": {
+    "name": "STM32F401RCT6",
+    "core_hz": 84000000,
+    "hse_hz": 25000000,
+    "flash_bytes": 262144,
+    "sram_bytes": 65536
+  },
+  "simulation": {
+    "seconds": 0.25,
+    "control_hz": 18004.4
+  },
+  "gpio": {
+    "PB10": 1,
+    "PB12": 1
+  },
+  "adc": {
+    "PA0": {"mode": "constant", "value": 2800},
+    "PA1": {"mode": "sine", "offset": 2048, "amplitude": 720, "frequency_hz": 50.0, "phase_deg": 0.0},
+    "PA2": {"mode": "sine", "offset": 2048, "amplitude": 680, "frequency_hz": 50.0, "phase_deg": 0.0},
+    "PA3": {"mode": "constant", "value": 2048},
+    "PA4": {"mode": "constant", "value": 1800},
+    "PA5": {"mode": "constant", "value": 4095}
+  },
+  "trace": {
+    "tim1": true,
+    "tim2": true,
+    "gpiob": true
+  }
+}
