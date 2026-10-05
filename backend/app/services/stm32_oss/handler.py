@@ -42,9 +42,7 @@ async def _handle_stm32(
       })
     return True
 
-  instance = stm32_oss_manager.instances.get(client_id)
-  owns_client = instance is not None and stm32_oss_manager.supports_board(instance.board)
-  if not owns_client:
+  if not stm32_oss_manager.owns_client(client_id):
     return False
 
   try:
@@ -92,7 +90,7 @@ async def _handle_stm32(
 
 
 async def _disconnect(client_id: str) -> None:
-  if client_id in stm32_oss_manager.instances:
+  if stm32_oss_manager.owns_client(client_id):
     await stm32_oss_manager.stop_instance(client_id)
 
 
