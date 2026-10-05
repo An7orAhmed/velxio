@@ -181,15 +181,30 @@ class Stm32OssManager:
   async def sensor_attach(self, client_id: str, data: dict) -> None:
     session = self.sessions.get(client_id)
     if session is not None:
-      session.sensors.append(dict(data))
+      pin = data.get('pin')
+      index = next((i for i, sensor in enumerate(session.sensors) if sensor.get('pin') == pin), -1)
+      if index >= 0:
+        session.sensors[index] = dict(data)
+      else:
+        session.sensors.append(dict(data))
     if client_id in self.instances:
       await self._command(client_id, {'cmd': 'sensor_attach', **data})
 
   async def sensor_update(self, client_id: str, data: dict) -> None:
+    session = self.sessions.get(client_id)
+    if session is not None:
+      pin = data.get('pin')
+      index = next((i for i, sensor in enumerate(session.sensors) if sensor.get('pin') == pin), -1)
+      if index >= 0:
+        session.sensors[index] = {**session.sensors[index], **data}
     if client_id in self.instances:
       await self._command(client_id, {'cmd': 'sensor_update', **data})
 
   async def sensor_detach(self, client_id: str, data: dict) -> None:
+    session = self.sessions.get(client_id)
+    if session is not None:
+      pin = data.get('pin')
+      session.sensors = [sensor for sensor in session.sensors if sensor.get('pin') != pin]
     if client_id in self.instances:
       await self._command(client_id, {'cmd': 'sensor_detach', **data})
 
