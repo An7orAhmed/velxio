@@ -69,6 +69,11 @@ app = FastAPI(
 # every fetch to velxio.dev is cross-origin and the browser blocks
 # preflight unless we explicitly allow the Tauri scheme(s).
 #
+# Vite automatically increments its dev port when 5173 is busy, and developers
+# commonly open the app through either localhost or 127.0.0.1. Keep the
+# production/desktop origins explicit, and allow any loopback HTTP(S) dev port
+# through the regex instead of maintaining a short hard-coded port list.
+#
 # Tauri origin per OS:
 #   - macOS / Linux: `tauri://localhost`
 #   - Windows:       `http://tauri.localhost`
@@ -78,14 +83,12 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
         "tauri://localhost",
         "http://tauri.localhost",
         "https://tauri.localhost",
         settings.FRONTEND_URL,
     ],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
