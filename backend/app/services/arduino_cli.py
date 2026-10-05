@@ -1,5 +1,9 @@
 import base64
 import configparser
+import os
+import shutil
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -17,6 +21,23 @@ from app.services.platformio import (
 )
 
 
+def _resolve_pio_path(cli_path: str | None = None) -> str:
+  if cli_path:
+    return cli_path
+
+  env_path = os.environ.get("VELXIO_PIO_PATH", "").strip()
+  if env_path:
+    return env_path
+
+  # When Velxio runs from backend/.venv, PlatformIO is installed beside the
+  # active Python executable even if the venv was not shell-activated.
+  sibling = Path(sys.executable).resolve().with_name("pio")
+  if sibling.is_file():
+    return str(sibling)
+
+  return shutil.which("pio") or "pio"
+
+
 class ArduinoCLIService(PlatformIOService):
   """Compatibility name for the PlatformIO compiler service.
 
@@ -24,6 +45,19 @@ class ArduinoCLIService(PlatformIOService):
   PlatformIO project from PlatformIOService. New workspaces carry a real
   PlatformIO tree and are built with their src/include/lib layout preserved.
   """
+
+  def __init__(self, cli_path: str | None = None):
+    super().__init__(_resolve_pio_path(cli_path))
+
+  async def _run(self, args: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess:
+    try:
+      return await super()._run(args, cwd=cwd)
+    except FileNotFoundError:
+      message = (
+        f"PlatformIO executable not found: {self.cli_path}. "
+        "Run scripts/macos-dev.sh --setup-only or install PlatformIO in the backend virtualenv."
+      )
+      return subprocess.CompletedProcess(args=args, returncode=127, stdout="", stderr=message)
 
   @staticmethod
   def _project_ini(files: list[dict]) -> str | None:
