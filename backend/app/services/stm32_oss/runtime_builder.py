@@ -26,6 +26,9 @@ class Stm32RuntimeBuilder:
   kept under VELXIO_STM32_RUNTIME_DIR (default: /tmp/velxio-stm32-runtime).
   Temporary source/build files are separate so they can be removed after the
   user approves cleanup without deleting the finished runtime.
+
+  Cleanup deliberately removes only files downloaded/generated under this
+  manager's work directory. It never uninstalls host packages or system tools.
   """
 
   def __init__(self) -> None:
@@ -54,8 +57,9 @@ class Stm32RuntimeBuilder:
   def managed_library(self) -> Optional[Path]:
     candidates = [
       self.runtime_dir / self.library_name,
-      self.runtime_dir / "libqemu-arm.so",
       self.runtime_dir / "libqemu-stm32.so",
+      self.runtime_dir / "libqemu-stm32.dylib",
+      self.runtime_dir / "libqemu-arm.so",
     ]
     return next((p for p in candidates if p.is_file()), None)
 
@@ -97,16 +101,21 @@ class Stm32RuntimeBuilder:
         "Set VELXIO_STM32_LIB to a compatible libqemu-stm32 library on Windows."
       )
 
-    required = ["git", "bash", "make"]
+    required = ["git", "bash", "make", "ninja", "perl", "awk", "tail"]
+    if sys.platform == "linux":
+      required.append("sed")
+    if sys.platform == "darwin":
+      required.append("uv")
     missing = [name for name in required if shutil.which(name) is None]
     if missing:
       raise RuntimeError(
         "Missing STM32 build tools: " + ", ".join(missing) +
-        ". Install them or set VELXIO_STM32_LIB to a compatible prebuilt runtime."
+        ". Install them or set VELXIO_STM32_LIB to a compatible prebuilt runtime. "
+        "Velxio will not install or remove system packages automatically."
       )
 
-    repo = os.getenv("VELXIO_STM32_QEMU_REPO", "https://github.com/lcgamboa/qemu_stm32.git")
-    ref = os.getenv("VELXIO_STM32_QEMU_REF", "picsimlab")
+    repo = os.getenv("VELXIO_STM32_QEMU_REPO", "https://github.com/lcgamboa/qemu.git")
+    ref = os.getenv("VELXIO_STM32_QEMU_REF", "picsimlab-stm32")
     src = self.work_dir / "qemu_stm32"
     self.runtime_dir.mkdir(parents=True, exist_ok=True)
     self.work_dir.mkdir(parents=True, exist_ok=True)
@@ -135,6 +144,7 @@ class Stm32RuntimeBuilder:
     await self._run(["bash", str(build_script)], cwd=src)
 
     built_candidates = [
+      src / "build" / self.library_name,
       src / "build" / "libqemu-stm32.so",
       src / "build" / "libqemu-stm32.dylib",
       src / "build" / "libqemu-stm32.dll",
