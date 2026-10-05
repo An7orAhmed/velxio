@@ -44,15 +44,6 @@ async def _handle_stm32(
 
   instance = stm32_oss_manager.instances.get(client_id)
   owns_client = instance is not None and stm32_oss_manager.supports_board(instance.board)
-
-  if msg_type == 'stm32_cleanup_build':
-    result = await stm32_runtime_builder.cleanup_build_files()
-    await callback('system', {
-      'event': 'stm32_runtime_cleanup_done',
-      **result,
-    })
-    return True
-
   if not owns_client:
     return False
 
@@ -78,7 +69,16 @@ async def _handle_stm32(
       await stm32_oss_manager.sensor_update(client_id, msg_data)
     elif msg_type == 'stm32_sensor_detach':
       await stm32_oss_manager.sensor_detach(client_id, msg_data)
-    elif msg_type in ('stm32_bus_map', 'stm32_bus_attrs'):
+    elif msg_type == 'stm32_bus_attrs':
+      owner = str(msg_data.get('owner') or '')
+      attrs = msg_data.get('attrs')
+      if owner == '__velxio_runtime__' and isinstance(attrs, dict) and attrs.get('cleanup_build'):
+        result = await stm32_runtime_builder.cleanup_build_files()
+        await callback('system', {
+          'event': 'stm32_runtime_cleanup_done',
+          **result,
+        })
+    elif msg_type == 'stm32_bus_map':
       pass
     else:
       return False
