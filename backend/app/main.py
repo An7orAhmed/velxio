@@ -130,6 +130,12 @@ app.include_router(iot_gateway.router, prefix="/api/gateway", tags=["iot-gateway
 from app.api.routes import news
 app.include_router(news.router, prefix="/api/news", tags=["news"])
 
+# Open self-hosted STM32 extension. It registers through the same hook seam as
+# optional/private board backends and currently claims only the Black Pill F401
+# board, leaving every other board available to another installed extension.
+from app.services.stm32_oss import register_stm32_oss_hooks
+register_stm32_oss_hooks()
+
 # Optional pro extension. The `app.pro` package only exists in private builds
 # (overlaid at Docker build time by an external repo) — its absence in the
 # open-source image is expected and silently ignored. Anyone with private
@@ -190,4 +196,3 @@ def health_libcache():
     nothing to detail."""
     detail = health_detail()
     return detail if detail is not None else {"status": "healthy", "overlay": "oss"}
-
