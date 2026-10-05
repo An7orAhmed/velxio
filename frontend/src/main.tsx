@@ -10,6 +10,7 @@ import './i18n';
 import { initTheme } from './lib/theme';
 import { markProExamplesSettled } from './data/examples';
 import { markProRoutesSettled } from './lib/proRoutes';
+import { installPlatformIOWorkspaceDefaults } from './utils/installPlatformIOWorkspaceDefaults';
 
 /** The overlay import has settled (either way): registries are final. */
 const markProOverlaySettled = (): void => {
@@ -41,6 +42,10 @@ loader.config({ paths: { vs: monacoVsPath } });
 // elsewhere (the OS, another tab, the docs portal). index.html already put the
 // right theme on <html> before the first paint; this keeps it there.
 initTheme();
+
+// New Arduino-framework workspaces are real PlatformIO projects
+// (platformio.ini + src/main.cpp). Saved legacy .ino projects are preserved.
+installPlatformIOWorkspaceDefaults();
 
 // Every deploy renames the hashed chunks and the old ones are gone from the
 // image. A tab opened before the deploy fails its next lazy import with
