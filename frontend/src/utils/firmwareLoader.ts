@@ -2,21 +2,23 @@
  * Firmware file loader — reads .hex, .bin, and .elf files and converts them
  * into the string format expected by compileBoardProgram().
  *
+ * Important STM32 rule:
+ * - STM32 QEMU consumes the original ELF, not a flattened PT_LOAD image.
+ *   Keeping the complete ELF preserves the entry point, program headers,
+ *   symbols/debug data, and the exact layout QEMU expects for -kernel.
+ *
+ * Other families keep their existing behavior:
  * - AVR boards expect Intel HEX text
- * - RP2040 boards expect base64-encoded raw binary
- * - ESP32 boards expect base64-encoded binary (merged flash image or raw app)
+ * - RP2040 / ESP32 boards expect base64-encoded raw binary
  */
 
 import type { BoardKind } from '../types/board';
 
-// ── Format detection ─────────────────────────────────────────────────────────
-
 export type FirmwareFormat = 'hex' | 'bin' | 'elf';
 
-const ELF_MAGIC = [0x7f, 0x45, 0x4c, 0x46]; // \x7FELF
+const ELF_MAGIC = [0x7f, 0x45, 0x4c, 0x46];
 
 export function detectFirmwareFormat(filename: string, bytes: Uint8Array): FirmwareFormat {
-  // Check ELF magic
   if (
     bytes.length >= 4 &&
     bytes[0] === ELF_MAGIC[0] &&
@@ -27,21 +29,14 @@ export function detectFirmwareFormat(filename: string, bytes: Uint8Array): Firmw
     return 'elf';
   }
 
-  // Check file extension
   const ext = filename.toLowerCase().split('.').pop() ?? '';
   if (ext === 'hex' || ext === 'ihex') return 'hex';
   if (ext === 'elf') return 'elf';
 
-  // Check if content looks like Intel HEX (first non-empty line starts with ':')
-  const firstByte = bytes[0];
-  if (firstByte === 0x3a) return 'hex'; // ':' character
-
+  if (bytes[0] === 0x3a) return 'hex';
   return 'bin';
 }
 
-// ── ELF architecture detection ───────────────────────────────────────────────
-
-// ELF e_machine values
 const EM_ARM = 0x28;
 const EM_AVR = 0x53;
 const EM_XTENSA = 0x5e;
@@ -57,12 +52,12 @@ export interface ElfInfo {
 
 export function detectArchitectureFromElf(bytes: Uint8Array): ElfInfo | null {
   if (bytes.length < 20) return null;
-  if (bytes[0] !== 0x7f || bytes[1] !== 0x45 || bytes[2] !== 0x4c || bytes[3] !== 0x46) return null;
+  if (bytes[0] !== 0x7f || bytes[1] !== 0x45 || bytes[2] !== 0x4c || bytes[3] !== 0x46) {
+    return null;
+  }
 
   const is32bit = bytes[4] === 1;
   const isLittleEndian = bytes[5] === 1;
-
-  // e_machine at offset 18 (2 bytes)
   const machine = isLittleEndian ? bytes[18] | (bytes[19] << 8) : (bytes[18] << 8) | bytes[19];
 
   let suggestedBoard: BoardKind | null = null;
@@ -74,7 +69,7 @@ export function detectArchitectureFromElf(bytes: Uint8Array): ElfInfo | null {
       architectureName = 'AVR';
       break;
     case EM_ARM:
-      suggestedBoard = 'raspberry-pi-pico';
+      suggestedBoard = null;
       architectureName = 'ARM';
       break;
     case EM_RISCV:
@@ -90,43 +85,31 @@ export function detectArchitectureFromElf(bytes: Uint8Array): ElfInfo | null {
   return { machine, is32bit, isLittleEndian, suggestedBoard, architectureName };
 }
 
-// ── ELF program extraction ───────────────────────────────────────────────────
-
-/**
- * Extract loadable (PT_LOAD) segments from a 32-bit ELF file.
- * Returns a flat binary image starting at the lowest physical address.
- */
 export function extractLoadSegmentsFromElf(bytes: Uint8Array): Uint8Array {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const is32bit = bytes[4] === 1;
   const isLE = bytes[5] === 1;
 
-  if (!is32bit) {
-    throw new Error('Only 32-bit ELF files are supported');
-  }
+  if (!is32bit) throw new Error('Only 32-bit ELF files are supported');
 
-  const u16 = (off: number) => (isLE ? view.getUint16(off, true) : view.getUint16(off, false));
-  const u32 = (off: number) => (isLE ? view.getUint32(off, true) : view.getUint32(off, false));
+  const u16 = (off: number) => view.getUint16(off, isLE);
+  const u32 = (off: number) => view.getUint32(off, isLE);
 
-  // ELF32 header fields
-  const e_phoff = u32(28); // program header table offset
-  const e_phentsize = u16(42); // program header entry size
-  const e_phnum = u16(44); // number of program header entries
+  const e_phoff = u32(28);
+  const e_phentsize = u16(42);
+  const e_phnum = u16(44);
 
   if (e_phoff === 0 || e_phnum === 0) {
     throw new Error('ELF file has no program headers');
   }
 
-  // Collect PT_LOAD segments
   const PT_LOAD = 1;
   const segments: { paddr: number; data: Uint8Array }[] = [];
 
   for (let i = 0; i < e_phnum; i++) {
     const phOff = e_phoff + i * e_phentsize;
     if (phOff + e_phentsize > bytes.length) break;
-
-    const p_type = u32(phOff);
-    if (p_type !== PT_LOAD) continue;
+    if (u32(phOff) !== PT_LOAD) continue;
 
     const p_offset = u32(phOff + 4);
     const p_paddr = u32(phOff + 12);
@@ -143,27 +126,18 @@ export function extractLoadSegmentsFromElf(bytes: Uint8Array): Uint8Array {
     });
   }
 
-  if (segments.length === 0) {
-    throw new Error('No loadable segments found in ELF file');
-  }
+  if (segments.length === 0) throw new Error('No loadable segments found in ELF file');
 
-  // Sort by physical address and create flat binary
   segments.sort((a, b) => a.paddr - b.paddr);
   const baseAddr = segments[0].paddr;
   const lastSeg = segments[segments.length - 1];
   const totalSize = lastSeg.paddr - baseAddr + lastSeg.data.length;
   const result = new Uint8Array(totalSize);
 
-  for (const seg of segments) {
-    result.set(seg.data, seg.paddr - baseAddr);
-  }
-
+  for (const seg of segments) result.set(seg.data, seg.paddr - baseAddr);
   return result;
 }
 
-// ── Binary ↔ Intel HEX conversion ───────────────────────────────────────────
-
-/** Convert a flat binary to Intel HEX text format (16 bytes per data record). */
 export function binaryToIntelHex(data: Uint8Array): string {
   const lines: string[] = [];
   const BYTES_PER_LINE = 16;
@@ -172,76 +146,58 @@ export function binaryToIntelHex(data: Uint8Array): string {
     const count = Math.min(BYTES_PER_LINE, data.length - addr);
     let line = ':';
 
-    // Byte count
     line += count.toString(16).padStart(2, '0').toUpperCase();
-    // Address (16-bit)
     line += (addr & 0xffff).toString(16).padStart(4, '0').toUpperCase();
-    // Record type 0x00 = data
     line += '00';
 
-    let checksum = count + ((addr >> 8) & 0xff) + (addr & 0xff) + 0x00;
+    let checksum = count + ((addr >> 8) & 0xff) + (addr & 0xff);
     for (let i = 0; i < count; i++) {
       const b = data[addr + i];
       line += b.toString(16).padStart(2, '0').toUpperCase();
       checksum += b;
     }
 
-    // Two's complement checksum
     line += ((~checksum + 1) & 0xff).toString(16).padStart(2, '0').toUpperCase();
     lines.push(line);
   }
 
-  // EOF record
   lines.push(':00000001FF');
   return lines.join('\n');
 }
 
-/** Convert ArrayBuffer to base64 string. */
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
+function bytesToBase64(bytes: Uint8Array): string {
+  const CHUNK = 0x8000;
   let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    const end = Math.min(bytes.length, i + CHUNK);
+    for (let j = i; j < end; j++) binary += String.fromCharCode(bytes[j]);
   }
   return btoa(binary);
 }
 
-// ── Board classification helpers ─────────────────────────────────────────────
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  return bytesToBase64(new Uint8Array(buffer));
+}
 
 const AVR_BOARDS = new Set<BoardKind>(['arduino-uno', 'arduino-nano', 'arduino-mega', 'attiny85']);
-
-const RP2040_BOARDS = new Set<BoardKind>(['raspberry-pi-pico', 'pi-pico-w']);
 
 function isAvrBoard(kind: BoardKind): boolean {
   return AVR_BOARDS.has(kind);
 }
 
-function isRp2040Board(kind: BoardKind): boolean {
-  return RP2040_BOARDS.has(kind);
+function isStm32Board(kind: BoardKind): boolean {
+  return kind.startsWith('stm32-');
 }
 
-// ── Main entry point ─────────────────────────────────────────────────────────
-
 export interface FirmwareLoadResult {
-  /** Program string ready for compileBoardProgram() */
   program: string;
-  /** Detected format */
   format: FirmwareFormat;
-  /** ELF info if available */
   elfInfo: ElfInfo | null;
-  /** Human-readable status */
   message: string;
 }
 
-const MAX_FILE_SIZE = 16 * 1024 * 1024; // 16 MB absolute max
+const MAX_FILE_SIZE = 16 * 1024 * 1024;
 
-/**
- * Read a firmware file and convert it to the format expected by compileBoardProgram().
- *
- * @param file - The File object from the file input
- * @param boardKind - The current board's kind (determines output format)
- * @returns The program string + metadata
- */
 export async function readFirmwareFile(
   file: File,
   boardKind: BoardKind,
@@ -262,22 +218,12 @@ export async function readFirmwareFile(
 
   switch (format) {
     case 'hex': {
-      // Intel HEX — read as text
-      const text = new TextDecoder().decode(bytes);
-      if (isAvrBoard(boardKind)) {
-        // AVR/RISC-V: pass HEX text directly
-        program = text;
-      } else {
-        // Non-AVR boards: we could parse HEX → binary → base64, but loadHex also exists
-        // for ESP32-C3 and RISC-V. Pass as text and let compileBoardProgram route it.
-        program = text;
-      }
+      program = new TextDecoder().decode(bytes);
       message = `Loaded Intel HEX firmware (${(file.size / 1024).toFixed(1)} KB)`;
       break;
     }
 
     case 'bin': {
-      // Raw binary — convert to base64
       program = arrayBufferToBase64(buffer);
       message = `Loaded binary firmware (${(file.size / 1024).toFixed(1)} KB)`;
       break;
@@ -287,16 +233,26 @@ export async function readFirmwareFile(
       elfInfo = detectArchitectureFromElf(bytes);
       const archName = elfInfo?.architectureName ?? 'unknown';
 
-      // Extract loadable segments
+      if (isStm32Board(boardKind)) {
+        if (elfInfo && elfInfo.machine !== EM_ARM) {
+          throw new Error(`ELF architecture is ${archName}; STM32 requires a 32-bit ARM ELF.`);
+        }
+        if (elfInfo && !elfInfo.is32bit) {
+          throw new Error('STM32 emulator requires a 32-bit ARM ELF.');
+        }
+
+        program = arrayBufferToBase64(buffer);
+        message = `Loaded STM32 ELF directly (${(file.size / 1024).toFixed(1)} KB, no source compile)`;
+        break;
+      }
+
       const loadData = extractLoadSegmentsFromElf(bytes);
 
       if (isAvrBoard(boardKind)) {
-        // AVR needs Intel HEX text
         program = binaryToIntelHex(loadData);
         message = `Loaded ELF firmware (${archName}, ${(file.size / 1024).toFixed(1)} KB) → Intel HEX`;
       } else {
-        // RP2040/ESP32 need base64 binary
-        program = arrayBufferToBase64(loadData.buffer);
+        program = bytesToBase64(loadData);
         message = `Loaded ELF firmware (${archName}, ${(file.size / 1024).toFixed(1)} KB) → binary`;
       }
       break;
