@@ -93,8 +93,8 @@ class Stm32OssManager:
   async def _launch(self, client_id: str, session: Stm32Session, firmware_b64: str) -> None:
     async with self._lock(client_id):
       await self._stop_worker_unlocked(client_id)
-      runtime = await stm32_runtime_builder.ensure_runtime(session.callback)
       machine = self.machine_for(session.board)
+      runtime = await stm32_runtime_builder.ensure_runtime(session.callback)
 
       process = await asyncio.create_subprocess_exec(
         sys.executable,
