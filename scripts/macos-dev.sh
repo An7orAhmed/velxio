@@ -65,7 +65,18 @@ pio="$venv/bin/pio"
 "$vpy" -m pip install --upgrade pip wheel
 "$pip" install -r "$root/backend/requirements.txt"
 
+# Keep the backend subprocess environment aligned with the virtualenv even
+# though this script launches executables by absolute path instead of sourcing
+# activate. PlatformIOService and any child process can therefore resolve pio.
+export PATH="$venv/bin:$PATH"
+export VELXIO_PIO_PATH="$pio"
 export PLATFORMIO_DISABLE_UPGRADE_CHECK=true
+
+if [[ ! -x "$pio" ]]; then
+  echo "PlatformIO executable was not installed at: $pio"
+  echo "Try: $pip install 'platformio>=6.2.0,<7'"
+  exit 1
+fi
 
 platforms=(
   "platformio/atmelavr"
@@ -89,6 +100,7 @@ fi
 if [[ "$setup_only" -eq 1 ]]; then
   echo
   echo "Setup complete."
+  echo "PlatformIO: $pio"
   echo "Run: bash scripts/macos-dev.sh"
   exit 0
 fi
@@ -148,7 +160,7 @@ echo
 echo "Velxio is running."
 echo "Frontend: http://127.0.0.1:5173"
 echo "Backend:  http://127.0.0.1:8001"
-echo "Compiler: PlatformIO"
+echo "Compiler: PlatformIO ($pio)"
 echo "Press Ctrl+C to stop both servers."
 
 if [[ "$no_open" -eq 0 ]]; then
