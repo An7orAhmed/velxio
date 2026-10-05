@@ -97,10 +97,25 @@ else
   npm install
 fi
 
+# Server/Docker installs use /var/lib/velxio-build by default. A normal macOS
+# user cannot create that path, so manual development keeps artifacts inside
+# the checkout unless the caller explicitly supplies another writable path.
+export VELXIO_ARTIFACT_CACHE="${VELXIO_ARTIFACT_CACHE:-$root/.cache/velxio-build/artifacts}"
+mkdir -p "$VELXIO_ARTIFACT_CACHE"
+
+# The open STM32 runtime is also kept in the repo-local cache. The backend will
+# build it on demand when an STM32F401xx target is selected.
+export VELXIO_STM32_AUTO_BUILD="${VELXIO_STM32_AUTO_BUILD:-1}"
+export VELXIO_STM32_RUNTIME_DIR="${VELXIO_STM32_RUNTIME_DIR:-$root/.cache/stm32-runtime}"
+export VELXIO_STM32_CLEANUP_PROMPT="${VELXIO_STM32_CLEANUP_PROMPT:-1}"
+mkdir -p "$VELXIO_STM32_RUNTIME_DIR"
+
 if [[ "$setup_only" -eq 1 ]]; then
   echo
   echo "Setup complete."
   echo "PlatformIO: $pio"
+  echo "Artifact cache: $VELXIO_ARTIFACT_CACHE"
+  echo "STM32 runtime: $VELXIO_STM32_RUNTIME_DIR"
   echo "Run: bash scripts/macos-dev.sh"
   exit 0
 fi
@@ -161,6 +176,8 @@ echo "Velxio is running."
 echo "Frontend: http://127.0.0.1:5173"
 echo "Backend:  http://127.0.0.1:8001"
 echo "Compiler: PlatformIO ($pio)"
+echo "Artifact cache: $VELXIO_ARTIFACT_CACHE"
+echo "STM32 runtime: $VELXIO_STM32_RUNTIME_DIR"
 echo "Press Ctrl+C to stop both servers."
 
 if [[ "$no_open" -eq 0 ]]; then
