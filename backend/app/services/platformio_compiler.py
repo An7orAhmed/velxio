@@ -24,7 +24,7 @@ BOARD_IDS = {
   "rp2040:rp2040:rpipicow": PlatformIOBoard("raspberrypi", "pico", "rp2040"),
   "esp32:esp32:esp32": PlatformIOBoard("espressif32", "esp32dev", "esp32"),
   "esp32:esp32:esp32cam": PlatformIOBoard("espressif32", "esp32cam", "esp32"),
-  "esp32:esp32:lolin32-lite": PlatformIOBoard("espressif32", "lolin32", "esp32"),
+  "esp32:esp32:lolin32-lite": PlatformIOBoard("espressif32", "lolin32_lite", "esp32"),
   "esp32:esp32:esp32s3": PlatformIOBoard("espressif32", "esp32-s3-devkitc-1", "esp32"),
   "esp32:esp32:XIAO_ESP32S3": PlatformIOBoard("espressif32", "seeed_xiao_esp32s3", "esp32"),
   "esp32:esp32:nano_nora": PlatformIOBoard("espressif32", "arduino_nano_esp32", "esp32"),
