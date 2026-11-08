@@ -70,9 +70,25 @@ export function platformIOConfig(boardKind: string, libraries: string[] = []): s
 }
 
 function cppFromSketch(code: string): string {
-  const lines = code.replace(/\r\n/g, '\n');
-  const includesArduino = /^\s*#\s*include\s*[<"]Arduino\.h[>"]/m.test(lines);
-  return (includesArduino ? '' : '#include <Arduino.h>\n\n') + lines;
+  const source = code.replace(/\r\n/g, '\n');
+  const includesArduino = /^\s*#\s*include\s*[<"]Arduino\.h[>"]/m.test(source);
+  const functionPattern = /^\s*(?:static\s+)?(?:void|bool|int|unsigned|float|double|String|char|long|short|size_t|u?int(?:8|16|32|64)_t)\s+([A-Za-z_]\w*)\s*\(([^(){};]*)\)\s*\{/gm;
+  const declarations = new Set<string>();
+  let firstFunction = -1;
+  let match: RegExpExecArray | null;
+
+  while ((match = functionPattern.exec(source)) !== null) {
+    if (firstFunction < 0) firstFunction = match.index;
+    if (match[1] === 'setup' || match[1] === 'loop' || match[2].includes('=')) continue;
+    const signature = match[0].trim().replace(/\s*\{\s*$/, '');
+    declarations.add(signature + ';');
+  }
+
+  const before = firstFunction < 0 ? source : source.slice(0, firstFunction);
+  const after = firstFunction < 0 ? '' : source.slice(firstFunction);
+  const prototypes = declarations.size ? Array.from(declarations).join('\n') + '\n\n' : '';
+  const body = before + prototypes + after;
+  return (includesArduino ? '' : '#include <Arduino.h>\n\n') + body;
 }
 
 export function platformIOExampleFiles(
