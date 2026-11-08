@@ -12,11 +12,36 @@ mkdir -p "$BIN" "$LOGS"
 export PATH="$BIN:/opt/homebrew/bin:/usr/local/bin:$PATH"
 cd "$ROOT"
 
-if [[ "$#" -gt 0 ]]; then
-  if [[ "$#" -ne 1 ]] || [[ "$1" != "--repair" ]]; then
-    printf 'Usage: ./run.sh [--repair]\n' >&2
-    exit 2
-  fi
+COMPILER="$(printenv VELXIO_COMPILER 2>/dev/null || printf 'arduino')"
+PIO=""
+REPAIR=0
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --compiler)
+      if [[ "$#" -lt 2 ]]; then
+        printf 'Missing compiler name. Choose arduino or platformio\n' >&2
+        exit 2
+      fi
+      COMPILER="$2"
+      shift 2
+      ;;
+    --repair)
+      REPAIR=1
+      shift
+      ;;
+    *)
+      printf 'Usage: ./run.sh [--compiler arduino|platformio] [--repair]\n' >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ "$COMPILER" != "arduino" ]] && [[ "$COMPILER" != "platformio" ]]; then
+  printf 'Invalid compiler: %s. Choose arduino or platformio\n' "$COMPILER" >&2
+  exit 2
+fi
+
+if [[ "$REPAIR" == "1" ]]; then
   printf '[velxio] Rebuilding local development dependencies\n'
   rm -rf "$VENV" "$ROOT/node_modules" "$ROOT/frontend/node_modules" "$STATE/tooling"
   rm -f "$STATE/python.sha256" "$STATE/root.sha256" "$STATE/frontend.sha256"
@@ -177,6 +202,10 @@ ensure_qemu() {
 }
 
 ensure_cores() {
+  if [[ "$COMPILER" == "platformio" ]]; then
+    log "PlatformIO selected. Skipping Arduino CLI board indexes and core downloads"
+    return
+  fi
   if [[ "$VELXIO_SKIP_CORES" == "1" ]]; then
     warn "Arduino core setup was skipped. STM32 compilation requires STMicroelectronics:stm32"
     return
@@ -275,6 +304,28 @@ ensure_python_deps() {
   fi
 }
 
+ensure_platformio() {
+  if [[ "$COMPILER" != "platformio" ]]; then
+    return
+  fi
+
+  local candidate=""
+  for candidate in "$(command -v pio || true)" "$(command -v platformio || true)" "$VENV/bin/pio"; do
+    if [[ -n "$candidate" ]] && [[ -x "$candidate" ]] &&
+      "$candidate" --version >/dev/null 2>&1; then
+      PIO="$candidate"
+      log "Found PlatformIO: $PIO"
+      return
+    fi
+  done
+
+  log "Installing PlatformIO CLI in the backend virtual environment"
+  "$VENV/bin/python" -m pip install --upgrade platformio
+  PIO="$VENV/bin/pio"
+  [[ -x "$PIO" ]] && "$PIO" --version >/dev/null 2>&1 ||
+    fail "PlatformIO installation failed"
+}
+
 ensure_npm_deps() {
   local directory="$1"
   local binary="$2"
@@ -312,10 +363,13 @@ ensure_package_manager
 ensure_tools
 ensure_python
 ensure_node
-ensure_arduino
+if [[ "$COMPILER" == "arduino" ]]; then
+  ensure_arduino
+fi
 ensure_qemu
 ensure_cores
 ensure_python_deps
+ensure_platformio
 ensure_npm_deps "$ROOT" tsx "$STATE/root.sha256"
 ensure_npm_deps "$ROOT/frontend" vite "$STATE/frontend.sha256"
 check_port 8001
@@ -324,7 +378,7 @@ check_port 5173
 log "Starting backend"
 (
   cd "$ROOT/backend"
-  exec env VELXIO_LOCAL_STM32=1 QEMU_STM32_BIN="$QEMU" \
+  exec env VELXIO_LOCAL_STM32=1 VELXIO_COMPILER="$COMPILER" VELXIO_PLATFORMIO_BIN="$PIO" QEMU_STM32_BIN="$QEMU" \
     "$VENV/bin/python" -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ) > "$LOGS/backend.log" 2>&1 &
 BACKEND_PID=$!
@@ -352,6 +406,7 @@ printf '  Backend API: http://localhost:8001/api/docs\n'
 printf '  API health:  http://localhost:8001/health\n'
 printf '  Logs:        %s\n' "$LOGS"
 printf '  STM32 QEMU:  %s\n' "$QEMU"
+printf '  Compiler:    %s\n' "$COMPILER"
 printf '  Stop:        Ctrl+C\n\n'
 
 while kill -0 "$BACKEND_PID" 2>/dev/null && kill -0 "$FRONTEND_PID" 2>/dev/null; do
