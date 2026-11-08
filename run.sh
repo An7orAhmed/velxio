@@ -36,12 +36,15 @@ while [[ "$#" -gt 0 ]]; do
         exit 2
       fi
       CLEANUP_MODE="tools"
-      if [[ "$#" -gt 1 ]] && [[ "$2" == "all" ]]; then
-        CLEANUP_MODE="all"
-        shift 2
-      else
-        shift
+      if [[ "$#" -gt 1 ]]; then
+        case "$2" in
+          all|arduino|platformio)
+            CLEANUP_MODE="$2"
+            shift
+            ;;
+        esac
       fi
+      shift
       ;;
     --dry-run)
       DRY_RUN=1
@@ -49,7 +52,7 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     *)
       printf 'Usage: ./run.sh [--compiler arduino|platformio] [--repair]\n' >&2
-      printf '       ./run.sh --cleanup [all] [--dry-run]\n' >&2
+      printf '       ./run.sh --cleanup [arduino|platformio|all] [--dry-run]\n' >&2
       exit 2
       ;;
   esac
