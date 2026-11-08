@@ -192,7 +192,7 @@ export async function importPlatformIOZip(file: File): Promise<PlatformIOImport 
   return buildPlatformIOImport(files, warnings);
 }
 
-export async function importPlatformIODirectory(selected: FileList): Promise<PlatformIOImport> {
+export async function importPlatformIODirectory(selected: FileList | File[]): Promise<PlatformIOImport> {
   const entries = Array.from(selected);
   if (entries.length > 500) throw new Error('PlatformIO project has more than 500 files.');
   const configFile = entries.find((file) => file.webkitRelativePath.endsWith('/platformio.ini'));
