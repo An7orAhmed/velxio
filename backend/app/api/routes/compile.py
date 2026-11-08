@@ -926,6 +926,19 @@ async def _run_compile(
 
     # One report per compile: never inherit the previous job's.
     scope_stats.set(None)
+    if not pure_idf and os.environ.get("VELXIO_COMPILER", "arduino").lower() == "platformio":
+        result = await compile_with_platformio(files, request.board_fqbn)
+        return CompileResponse(
+            success=result["success"],
+            hex_content=result.get("hex_content"),
+            binary_content=result.get("binary_content"),
+            binary_type=result.get("binary_type"),
+            uf2_content=result.get("uf2_content"),
+            stdout=result.get("stdout", ""),
+            stderr=result.get("stderr", ""),
+            error=result.get("error"),
+        )
+
     if request.board_fqbn.startswith("esp32:") and espidf_compiler.available:
         logger.info(
             f"[compile] Using ESP-IDF for {request.board_fqbn}"
@@ -960,19 +973,6 @@ async def _run_compile(
             manifest_incomplete=result.get("manifest_incomplete", False),
             manifest_suggested_libraries=result.get("manifest_suggested_libraries"),
             scope=_scope_of(result),
-        )
-
-    if os.environ.get("VELXIO_COMPILER", "arduino").lower() == "platformio":
-        result = await compile_with_platformio(files, request.board_fqbn)
-        return CompileResponse(
-            success=result["success"],
-            hex_content=result.get("hex_content"),
-            binary_content=result.get("binary_content"),
-            binary_type=result.get("binary_type"),
-            uf2_content=result.get("uf2_content"),
-            stdout=result.get("stdout", ""),
-            stderr=result.get("stderr", ""),
-            error=result.get("error"),
         )
 
     # AVR, RP2040, and ESP32 fallback: use arduino-cli
