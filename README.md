@@ -21,6 +21,9 @@ The launcher checks Node.js, npm, Python, Arduino CLI and QEMU, installs missing
 - Local application: http://localhost:5173
 - Backend API documentation: http://localhost:8001/api/docs
 - Run `./run.sh --repair` to rebuild local Python and npm dependencies.
+- The launcher scopes Arduino package index URLs to this process. A missing or stale `package_rp2040_index.json` in your personal Arduino configuration will not block the STM32 core setup.
+- The launcher checks that `STMicroelectronics:stm32` is installed before starting. Installation errors stop startup instead of allowing broken firmware compilation.
+- If RP2040 support is needed, run `VELXIO_INSTALL_PICO=1 ./run.sh`. If the RP2040 index fails, STM32 installation is retried independently.
 - Set `VELXIO_SKIP_CORES=1` to skip Arduino core downloads.
 - Set `VELXIO_INSTALL_PICO=1` to install the optional RP2040 core.
 - Stop the servers with Ctrl+C. Logs are stored in `.run/logs/`.
