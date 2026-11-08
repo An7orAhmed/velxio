@@ -42,9 +42,46 @@ class PlatformIOCompilerTests(unittest.TestCase):
       ], PlatformIOBoard("atmelavr", "uno", "avr"))
       project = Path(root)
       self.assertTrue((project / "src/main.ino").exists())
-      self.assertTrue((project / "src/lib/helper.cpp").exists())
+      self.assertTrue((project / "lib/helper.cpp").exists())
       self.assertTrue((project / "include/pins.h").exists())
       self.assertIn("platform = atmelavr", (project / "platformio.ini").read_text())
+
+  def test_existing_platformio_config_and_tree_survive(self):
+    original = (
+      "[platformio]\n"
+      "default_envs = target\n\n"
+      "[env:target]\n"
+      "platform = ststm32\n"
+      "board = blackpill_f401ce\n"
+      "framework = arduino\n"
+      "lib_deps =\n"
+      "  adafruit/Adafruit BusIO\n"
+      "build_flags = -DPRODUCT_REV=2\n"
+    )
+    with tempfile.TemporaryDirectory() as root:
+      environment = prepare_project(root, [
+        {"name": "platformio.ini", "content": original},
+        {"name": "src/main.cpp", "content": "#include <Arduino.h>\nvoid setup() {}\nvoid loop() {}"},
+        {"name": "include/board.h", "content": "#define BOARD_ID 401"},
+        {"name": "lib/signal/src/signal.cpp", "content": "int signal() { return 1; }"},
+        {"name": "lib/signal/include/signal.h", "content": "int signal();"},
+      ], PlatformIOBoard("ststm32", "blackpill_f401ce", "stm32"))
+      project = Path(root)
+      self.assertEqual(environment, "target")
+      self.assertEqual((project / "platformio.ini").read_text(), original)
+      self.assertTrue((project / "src/main.cpp").exists())
+      self.assertTrue((project / "include/board.h").exists())
+      self.assertTrue((project / "lib/signal/src/signal.cpp").exists())
+      self.assertTrue((project / "lib/signal/include/signal.h").exists())
+
+  def test_configuration_fails_if_board_does_not_match_workspace(self):
+    config = "[env:uno]\nplatform = atmelavr\nboard = uno\nframework = arduino\n"
+    with tempfile.TemporaryDirectory() as root:
+      with self.assertRaisesRegex(ValueError, "no environment targeting"):
+        prepare_project(root, [
+          {"name": "platformio.ini", "content": config},
+          {"name": "src/main.cpp", "content": "int main() { return 0; }"},
+        ], PlatformIOBoard("ststm32", "blackpill_f401ce", "stm32"))
 
   def test_invalid_filename_is_rejected(self):
     with tempfile.TemporaryDirectory() as root:
