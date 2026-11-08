@@ -178,35 +178,54 @@ ensure_qemu() {
 
 ensure_cores() {
   if [[ "$VELXIO_SKIP_CORES" == "1" ]]; then
-    log "Arduino core setup skipped"
+    warn "Arduino core setup was skipped. STM32 compilation requires STMicroelectronics:stm32"
     return
   fi
-  arduino-cli config init >/dev/null 2>&1 || true
+
   local stm32_url="https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json"
-  if ! arduino-cli config dump 2>/dev/null | grep -qF "$stm32_url"; then
-    arduino-cli config add board_manager.additional_urls "$stm32_url" || warn "Unable to add STM32 board index"
+  local pico_url="https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json"
+  local core=""
+  local pico_enabled="$VELXIO_INSTALL_PICO"
+
+  log "Repairing Arduino package indexes without changing your global Arduino configuration"
+  export ARDUINO_BOARD_MANAGER_ADDITIONAL_URLS="$stm32_url"
+  if [[ "$pico_enabled" == "1" ]]; then
+    export ARDUINO_BOARD_MANAGER_ADDITIONAL_URLS="$stm32_url $pico_url"
   fi
-  if [[ "$VELXIO_INSTALL_PICO" == "1" ]]; then
-    local pico_url="https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json"
-    if ! arduino-cli config dump 2>/dev/null | grep -qF "$pico_url"; then
-      arduino-cli config add board_manager.additional_urls "$pico_url" || warn "Unable to add RP2040 board index"
+
+  if ! arduino-cli core update-index; then
+    if [[ "$pico_enabled" == "1" ]]; then
+      warn "The RP2040 package index failed. Retrying with the STM32 index only"
+      export ARDUINO_BOARD_MANAGER_ADDITIONAL_URLS="$stm32_url"
+      pico_enabled=0
+      arduino-cli core update-index ||
+        fail "STM32 index download failed. Check network access to stm32duino/BoardManagerFiles"
+    else
+      fail "Arduino package indexes could not be updated. Check the network or run ./run.sh again"
     fi
   fi
-  if ! arduino-cli core update-index; then
-    warn "Board index update failed. Existing Arduino cores can still work"
-    return
-  fi
-  local core=""
+
   for core in arduino:avr STMicroelectronics:stm32; do
     if ! arduino-cli core list | grep -q "^$core[[:space:]]"; then
-      log "Installing Arduino core $core"
-      arduino-cli core install "$core" || warn "Arduino core installation failed: $core"
+      log "Installing missing Arduino core $core"
+      arduino-cli core install "$core" ||
+        fail "Failed to install $core. Check the Arduino CLI output and retry ./run.sh"
+    fi
+    if ! arduino-cli core list | grep -q "^$core[[:space:]]"; then
+      fail "$core is still missing after setup. Firmware compilation would fail"
     fi
   done
-  if [[ "$VELXIO_INSTALL_PICO" == "1" ]] &&
-    ! arduino-cli core list | grep -q '^rp2040:rp2040[[:space:]]'; then
-    arduino-cli core install rp2040:rp2040 || warn "RP2040 board core installation failed"
+
+  if [[ "$pico_enabled" == "1" ]]; then
+    if ! arduino-cli core list | grep -q '^rp2040:rp2040[[:space:]]'; then
+      log "Installing RP2040 board core"
+      arduino-cli core install rp2040:rp2040 ||
+        warn "RP2040 installation failed. STM32 and AVR are available"
+    fi
   fi
+
+  log "Installed Arduino cores:"
+  arduino-cli core list
 }
 
 fingerprint() {
