@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 import asyncio
 from contextlib import asynccontextmanager
@@ -156,6 +157,11 @@ try:
     register_pro_boards(app)
 except ImportError:
     pass
+
+if os.environ.get("VELXIO_LOCAL_STM32") == "1":
+    from app.local_stm32 import register_local_stm32
+    register_local_stm32()
+
 
 @app.get("/")
 def root():
