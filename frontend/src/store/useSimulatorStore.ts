@@ -2596,7 +2596,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       }
       // ── Interconnect: register the board and rebuild routes ──────────
       icBindBoard(id, boardKind);
-      icUpdateWires(get().wires);
+      icUpdateWires(get().wires, get().components);
       return id;
     },
 
@@ -2663,7 +2663,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       }
       // ── Interconnect: drop board and rebuild routes ──────────────────
       icUnbindBoard(boardId);
-      icUpdateWires(get().wires);
+      icUpdateWires(get().wires, get().components);
     },
 
     updateBoard: (boardId: string, updates: Partial<BoardInstance>) => {
@@ -2907,7 +2907,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       // pinPositionCalculator can resolve their pinInfo.
       requestAnimationFrame(() => {
         recalculateAllWirePositions();
-        icUpdateWires(get().wires);
+        icUpdateWires(get().wires, get().components);
       });
     },
 
@@ -5242,23 +5242,26 @@ setInterconnectRuntime({
 
 // Bind the initial Arduino Uno that ships with the store.
 icBindBoard(INITIAL_BOARD_ID, 'arduino-uno');
-icUpdateWires(useSimulatorStore.getState().wires);
+icUpdateWires(useSimulatorStore.getState().wires, useSimulatorStore.getState().components);
 
 // React to wire mutations from any source (drag, import, setState, ...).
 let lastWiresRef: readonly Wire[] = useSimulatorStore.getState().wires;
 let lastBoardsRef: readonly BoardInstance[] = useSimulatorStore.getState().boards;
+let lastNetComponents = useSimulatorStore.getState().components;
 useSimulatorStore.subscribe((state) => {
   const wiresChanged = state.wires !== lastWiresRef;
   const boardsChanged = state.boards !== lastBoardsRef;
+  const componentsChanged = state.components !== lastNetComponents;
+  if (componentsChanged) lastNetComponents = state.components;
   if (boardsChanged) {
     lastBoardsRef = state.boards;
     // Bind any boards that appeared in state but not yet in interconnect
     // (covers paths that bypass addBoard, e.g. import-from-zip, hot reload).
     for (const b of state.boards) icBindBoard(b.id, b.boardKind);
   }
-  if (wiresChanged || boardsChanged) {
+  if (wiresChanged || boardsChanged || componentsChanged) {
     lastWiresRef = state.wires;
-    icUpdateWires(state.wires);
+    icUpdateWires(state.wires, state.components);
   }
 });
 
