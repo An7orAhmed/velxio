@@ -11,6 +11,8 @@ import { fileIconFor, getFileIconsVersion, subscribeFileIcons } from '../../lib/
 import type { BoardKind } from '../../types/board';
 import { boardDisplayName, isKnownBoardKind, isPiBoardKind } from '../../types/board';
 import { importProjectFile, PROJECT_FILE_ACCEPT } from '../../utils/importProject';
+import { importPlatformIODirectory } from '../../utils/platformioProject';
+import { applyPlatformIOImport } from '../../utils/applyPlatformIOImport';
 import { retargetBoardWires } from '../../utils/wokwiZip';
 import { showMessageDialog, showConfirmDialog } from '../../store/useMessageDialogStore';
 import { registerEditorCommand } from '../../lib/editorCommands';
@@ -468,6 +470,37 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick, onNewCl
   // loader to run based on the file extension.  Kept outside React state so
   // the change event still fires when the user picks the same file twice.
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const platformIOFolderInputRef = useRef<HTMLInputElement | null>(null);
+  const handlePlatformIOFolderOpen = useCallback(() => {
+    platformIOFolderInputRef.current?.click();
+  }, []);
+  const handlePlatformIOFolderPicked = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (!files.length) return;
+    const confirmed = await showConfirmDialog(
+      t('editor.fileExplorer.confirmLoad.message', { type: 'PlatformIO folder' }),
+      {
+        kind: 'error',
+        title: t('editor.fileExplorer.confirmLoad.title'),
+        confirmLabel: t('editor.fileExplorer.confirmLoad.confirm'),
+        cancelLabel: t('editor.fileTabs.cancel'),
+        danger: true,
+      },
+    );
+    if (!confirmed) return;
+
+    try {
+      const result = await importPlatformIODirectory(files);
+      applyPlatformIOImport(result);
+      if (result.warnings.length) {
+        showMessageDialog(result.warnings.join('\n'), { kind: 'info' });
+      }
+    } catch (error) {
+      showMessageDialog((error as Error).message, { kind: 'error' });
+    }
+  }, [t]);
+
   const handleOpenProjectClick = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
@@ -476,7 +509,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick, onNewCl
     // Reset so picking the SAME file again later still fires onchange.
     e.target.value = '';
     if (!file) return;
-    const friendlyName = file.name.toLowerCase().endsWith('.zip') ? 'Wokwi .zip' : '.vlx';
+    const friendlyName = file.name.toLowerCase().endsWith('.zip') ? 'Wokwi or PlatformIO .zip' : '.vlx';
     const confirmed = await showConfirmDialog(
       t('editor.fileExplorer.confirmLoad.message', { type: friendlyName }),
       {
@@ -490,6 +523,13 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick, onNewCl
     if (!confirmed) return;
     try {
       const result = await importProjectFile(file);
+      if (result.kind === 'platformio') {
+        applyPlatformIOImport(result);
+        if (result.warnings.length) {
+          showMessageDialog(result.warnings.join('\n'), { kind: 'info' });
+        }
+        return;
+      }
       // .zip needs the caller to apply the payload to the stores (we keep
       // that asymmetry so the toolbar's import flow can also pop the
       // install-libraries modal afterwards). Here in the file explorer we
@@ -839,6 +879,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick, onNewCl
   // (which targets the ACTIVE board's file group, same as its + button).
   useEffect(() => {
     const offOpen = registerEditorCommand('project.open', handleOpenProjectClick);
+    const offPlatformIO = registerEditorCommand('project.importPlatformioFolder', handlePlatformIOFolderOpen);
     const offNewFile = registerEditorCommand('file.new', () => {
       const st = useSimulatorStore.getState();
       const board = st.boards.find((b) => b.id === st.activeBoardId) ?? st.boards[0];
@@ -849,6 +890,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick, onNewCl
     });
     return () => {
       offOpen();
+      offPlatformIO();
       offNewFile();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -939,11 +981,28 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick, onNewCl
           </button>
           <button
             className="file-explorer-save-btn"
-            title="Open project (.vlx Velxio or .zip Wokwi)"
+            title="Open project (.vlx, Wokwi .zip, or PlatformIO .zip)"
             onClick={handleOpenProjectClick}
           >
             <IcoOpen />
           </button>
+          <button
+            className="file-explorer-save-btn"
+            title="Import PlatformIO project folder"
+            onClick={handlePlatformIOFolderOpen}
+          >
+            <IcoFolder open />
+          </button>
+          <input
+            ref={(element) => {
+              platformIOFolderInputRef.current = element;
+              element?.setAttribute('webkitdirectory', '');
+            }}
+            type="file"
+            multiple
+            onChange={handlePlatformIOFolderPicked}
+            style={{ display: 'none' }}
+          />
           <input
             ref={fileInputRef}
             type="file"
