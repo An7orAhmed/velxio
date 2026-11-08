@@ -51,6 +51,14 @@ describe('PlatformIO workspace mode', () => {
     expect(files.every((file) => !file.name.endsWith('.ino'))).toBe(true);
   });
 
+  it('adds a forward declaration for simple helpers used before their definitions', () => {
+    vi.stubEnv('VITE_VELXIO_COMPILER', 'platformio');
+    const source = 'void setup() { helper(); }\nvoid loop() {}\nvoid helper() {}';
+    const result = platformIOExampleFiles('arduino-uno', source);
+    const cpp = result.find((file) => file.name === 'src/main.cpp')!.content;
+    expect(cpp.indexOf('void helper();')).toBeLessThan(cpp.indexOf('void setup()'));
+  });
+
   it('retains source folders and headers for multi-file examples', () => {
     vi.stubEnv('VITE_VELXIO_COMPILER', 'platformio');
     const files = platformIOExampleFiles('arduino-uno', '', [
