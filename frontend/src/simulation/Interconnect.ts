@@ -39,6 +39,7 @@ import { isPiBoardKind, isStm32BoardKind, type BoardKind } from '../types/board'
 import type { Wire } from '../types/wire';
 import { getProBoard } from '../lib/proBoardRegistry';
 import { boardPinToNumber } from '../utils/boardPinMapping';
+import { virtualNamedWires } from '../utils/virtualNamedWires';
 import { isUartWire } from '../utils/boardProtocols';
 import { busRegistry } from './buses/registry';
 import {
@@ -736,15 +737,19 @@ let lastWireSnapshot: string = '';
  * Called by the store on every wire mutation and also on board
  * add/remove.
  */
-export function updateWires(wires: readonly Wire[]): void {
+export function updateWires(
+  wires: readonly Wire[],
+  components: readonly { id: string; metadataId: string; properties: Record<string, unknown> }[] = [],
+): void {
+  const allWires = [...wires, ...virtualNamedWires(components, wires)];
   // Quick skip if nothing changed (compare by composite identity).
-  const sig = wires
+  const sig = allWires
     .map(
       (w) =>
         `${w.id}|${w.start.componentId}:${w.start.pinName}|${w.end.componentId}:${w.end.pinName}`,
     )
     .join(',');
-  if (sig === lastWireSnapshot && wires.length === routes.size) {
+  if (sig === lastWireSnapshot && allWires.length === routes.size) {
     // Nothing changed in the routing-relevant fields.
     return;
   }
@@ -755,7 +760,7 @@ export function updateWires(wires: readonly Wire[]): void {
   routes.clear();
 
   // Build fresh routes for each wire whose endpoints both resolve.
-  for (const w of wires) {
+  for (const w of allWires) {
     const r = buildRouteForWire(w);
     if (r) routes.set(w.id, r);
   }
