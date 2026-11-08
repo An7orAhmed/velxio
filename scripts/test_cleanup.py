@@ -1,5 +1,6 @@
 import os
 import pty
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -7,6 +8,7 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).with_name("cleanup.sh")
+RUNNER = SCRIPT.parent.parent / "run.sh"
 
 
 class CleanupTests(unittest.TestCase):
@@ -18,7 +20,9 @@ class CleanupTests(unittest.TestCase):
     (self.repo / "backend" / "app").mkdir(parents=True)
     (self.repo / "frontend").mkdir()
     (self.repo / ".git").mkdir()
-    (self.repo / "run.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    shutil.copyfile(RUNNER, self.repo / "run.sh")
+    (self.repo / "scripts").mkdir()
+    shutil.copyfile(SCRIPT, self.repo / "scripts" / "cleanup.sh")
     (self.repo / "backend" / "app" / "main.py").write_text("app = None\n", encoding="utf-8")
     (self.repo / "frontend" / "package.json").write_text("{}\n", encoding="utf-8")
     (self.repo / "backend" / ".venv").mkdir()
@@ -41,7 +45,11 @@ class CleanupTests(unittest.TestCase):
     self.env["HOME"] = str(self.home)
 
   def run_cleanup(self, mode, *, dry_run=False, confirmation=None):
-    command = ["bash", str(SCRIPT), str(self.repo), mode, "1" if dry_run else "0"]
+    command = ["bash", str(self.repo / "run.sh"), "--cleanup"]
+    if mode == "all":
+      command.append("all")
+    if dry_run:
+      command.append("--dry-run")
 
     if confirmation is None:
       return subprocess.run(
@@ -79,6 +87,12 @@ class CleanupTests(unittest.TestCase):
     self.assertTrue(self.shared.exists())
     self.assertTrue(self.arduino.exists())
     self.assertTrue(self.repo.exists())
+
+  def test_preview_creates_no_runner_artifacts(self):
+    (self.repo / ".run").rmdir()
+    result = self.run_cleanup("tools", dry_run=True)
+    self.assertEqual(result.returncode, 0, result.stderr)
+    self.assertFalse((self.repo / ".run").exists())
 
   def test_does_not_delete_without_interactive_confirmation(self):
     result = self.run_cleanup("all")
