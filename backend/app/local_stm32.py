@@ -51,6 +51,57 @@ def build_command(qemu: str, firmware: str) -> list[str]:
   ]
 
 
+def decode_intel_hex(firmware: bytes) -> bytes:
+  addresses: dict[int, int] = {}
+  base_address = 0
+
+  for raw_line in firmware.splitlines():
+    line = raw_line.strip()
+    if not line:
+      continue
+    if not line.startswith(b":"):
+      raise ValueError("Invalid Intel HEX record")
+
+    try:
+      record = bytes.fromhex(line[1:].decode("ascii"))
+    except (UnicodeDecodeError, ValueError) as exc:
+      raise ValueError("Invalid Intel HEX encoding") from exc
+
+    if len(record) < 5 or len(record) != record[0] + 5 or sum(record) & 0xFF:
+      raise ValueError("Invalid Intel HEX checksum or record size")
+
+    address = int.from_bytes(record[1:3], "big")
+    record_type = record[3]
+    payload = record[4:-1]
+
+    if record_type == 0:
+      for index, value in enumerate(payload):
+        addresses[base_address + address + index] = value
+    elif record_type == 1:
+      break
+    elif record_type == 2 and len(payload) == 2:
+      base_address = int.from_bytes(payload, "big") << 4
+    elif record_type == 4 and len(payload) == 2:
+      base_address = int.from_bytes(payload, "big") << 16
+    elif record_type not in (3, 5):
+      raise ValueError("Unsupported Intel HEX record type")
+
+  if not addresses:
+    raise ValueError("Intel HEX contains no firmware data")
+
+  first_address = min(addresses)
+  flash_start = 0x08000000 if 0x08000000 <= first_address < 0x08100000 else 0
+  size = max(addresses) - flash_start + 1
+
+  if first_address < flash_start or size > 2 * 1024 * 1024:
+    raise ValueError("Intel HEX address range is outside the supported flash image")
+
+  image = bytearray(b"\xFF" * size)
+  for address, value in addresses.items():
+    image[address - flash_start] = value
+  return bytes(image)
+
+
 def decode_firmware(firmware_b64: str) -> tuple[bytes, str]:
   try:
     firmware = base64.b64decode(firmware_b64, validate=True)
@@ -59,9 +110,8 @@ def decode_firmware(firmware_b64: str) -> tuple[bytes, str]:
   if not firmware:
     raise ValueError("Firmware is empty")
   if firmware.lstrip().startswith(b":"):
-    raise ValueError("Intel HEX is not supported by this runtime. Upload an ELF or BIN file")
+    return decode_intel_hex(firmware), ".bin"
   return firmware, ".elf" if firmware.startswith(b"\x7fELF") else ".bin"
-
 
 @dataclass
 class LocalSession:
