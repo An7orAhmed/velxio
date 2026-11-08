@@ -22,6 +22,7 @@ function getLanguage(filename: string): string {
   if (['ino', 'cpp', 'c', 'cc', 'h', 'hpp'].includes(ext)) return 'cpp';
   if (ext === 'py') return 'python';
   if (ext === 'json') return 'json';
+  if (ext === 'ini') return 'ini';
   if (ext === 'md') return 'markdown';
   // Web files (a page served by an ESP32 sketch, an extension's scene page):
   // Monaco ships these languages, they only needed naming.
