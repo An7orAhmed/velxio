@@ -285,8 +285,9 @@ class ArduinoCLIService:
         # Cached `core list` output; see _is_core_installed. Invalidated
         # wherever a core is installed so a fresh install is seen immediately.
         self._installed_cores: str | None = None
-        self._ensure_board_urls()
-        self._ensure_core_installed()
+        if os.environ.get("VELXIO_COMPILER", "arduino").lower() != "platformio":
+            self._ensure_board_urls()
+            self._ensure_core_installed()
 
     def _all_core_urls(self) -> dict[str, str]:
         """Built-in cores plus whatever an overlay registered."""
