@@ -46,6 +46,7 @@ import { tagOwnsPointer } from '../utils/partOwnsPointer';
 // <velxio-instr-voltmeter>) that don't exist upstream.
 import '@wokwi/elements';
 import '../velxio-elements';
+import './velxio-components/NetTerminalElement';
 import './velxio-components/Ssd1306I2cElement'; // registers velxio-ssd1306-i2c-4pin (4-pin I2C OLED)
 
 // The wire-graph walk that answers "which board pin owns this component pin"
