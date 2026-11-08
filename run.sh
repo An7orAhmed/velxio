@@ -10,6 +10,9 @@ BACKEND_PID=""
 FRONTEND_PID=""
 COMPILER="$(printenv VELXIO_COMPILER 2>/dev/null || printf 'arduino')"
 PIO=""
+STM32_ENGINE="$(printenv VELXIO_STM32_ENGINE 2>/dev/null || printf '')"
+RENODE=""
+HAS_ENGINE_FLAG=0
 REPAIR=0
 CLEANUP_MODE=""
 DRY_RUN=0
@@ -24,6 +27,15 @@ while [[ "$#" -gt 0 ]]; do
       fi
       COMPILER="$2"
       HAS_COMPILER_FLAG=1
+      shift 2
+      ;;
+    --stm32-engine)
+      if [[ "$#" -lt 2 ]]; then
+        printf 'Missing STM32 engine. Choose qemu or renode\n' >&2
+        exit 2
+      fi
+      STM32_ENGINE="$2"
+      HAS_ENGINE_FLAG=1
       shift 2
       ;;
     --repair)
@@ -51,7 +63,7 @@ while [[ "$#" -gt 0 ]]; do
       shift
       ;;
     *)
-      printf 'Usage: ./run.sh [--compiler arduino|platformio] [--repair]\n' >&2
+      printf 'Usage: ./run.sh [--compiler arduino|platformio] [--stm32-engine qemu|renode] [--repair]\n' >&2
       printf '       ./run.sh --cleanup [arduino|platformio|all] [--dry-run]\n' >&2
       exit 2
       ;;
@@ -59,8 +71,8 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 if [[ -n "$CLEANUP_MODE" ]]; then
-  if [[ "$REPAIR" == "1" ]] || [[ "$HAS_COMPILER_FLAG" == "1" ]]; then
-    printf 'Cleanup cannot be combined with --repair or --compiler\n' >&2
+  if [[ "$REPAIR" == "1" ]] || [[ "$HAS_COMPILER_FLAG" == "1" ]] || [[ "$HAS_ENGINE_FLAG" == "1" ]]; then
+    printf 'Cleanup cannot be combined with --repair, --compiler or --stm32-engine\n' >&2
     exit 2
   fi
   exec bash "$ROOT/scripts/cleanup.sh" "$ROOT" "$CLEANUP_MODE" "$DRY_RUN"
@@ -68,6 +80,18 @@ fi
 
 if [[ "$DRY_RUN" == "1" ]]; then
   printf -- '--dry-run is only available with --cleanup\n' >&2
+  exit 2
+fi
+
+if [[ -z "$STM32_ENGINE" ]]; then
+  if [[ "$COMPILER" == "platformio" ]]; then
+    STM32_ENGINE="renode"
+  else
+    STM32_ENGINE="qemu"
+  fi
+fi
+if [[ "$STM32_ENGINE" != "qemu" ]] && [[ "$STM32_ENGINE" != "renode" ]]; then
+  printf 'Invalid STM32 emulator: %s. Choose qemu or renode\n' "$STM32_ENGINE" >&2
   exit 2
 fi
 
@@ -240,6 +264,30 @@ ensure_qemu() {
   fi
 }
 
+ensure_stm32_engine() {
+  if [[ "$STM32_ENGINE" == "qemu" ]]; then
+    ensure_qemu
+    return
+  fi
+
+  if command -v renode >/dev/null 2>&1; then
+    RENODE="$(command -v renode)"
+  elif [[ -x "/Applications/Renode.app/Contents/MacOS/renode" ]]; then
+    RENODE="/Applications/Renode.app/Contents/MacOS/renode"
+  elif [[ "$(uname -s)" == "Darwin" ]]; then
+    log "Installing Renode STM32 emulator with real GPIO support"
+    brew install renode/tap/renode ||
+      fail "Renode installation failed. You can run with --stm32-engine qemu, but STM32 LEDs will not blink"
+    RENODE="$(command -v renode || true)"
+  else
+    fail "Renode is required for STM32 GPIO simulation. Install Renode on Linux or launch with --stm32-engine qemu for UART-only emulation"
+  fi
+
+  [[ -n "$RENODE" ]] && [[ -x "$RENODE" ]] ||
+    fail "Renode binary was not found after setup"
+  log "STM32 GPIO emulation: $RENODE"
+}
+
 ensure_cores() {
   if [[ "$COMPILER" == "platformio" ]]; then
     log "PlatformIO selected. Skipping Arduino CLI board indexes and core downloads"
@@ -405,7 +453,7 @@ ensure_node
 if [[ "$COMPILER" == "arduino" ]]; then
   ensure_arduino
 fi
-ensure_qemu
+ensure_stm32_engine
 ensure_cores
 ensure_python_deps
 ensure_platformio
@@ -417,7 +465,7 @@ check_port 5173
 log "Starting backend"
 (
   cd "$ROOT/backend"
-  exec env VELXIO_LOCAL_STM32=1 VELXIO_COMPILER="$COMPILER" VELXIO_PLATFORMIO_BIN="$PIO" QEMU_STM32_BIN="$QEMU" \
+  exec env VELXIO_LOCAL_STM32=1 VELXIO_COMPILER="$COMPILER" VELXIO_PLATFORMIO_BIN="$PIO" VELXIO_STM32_ENGINE="$STM32_ENGINE" VELXIO_RENODE_BIN="$RENODE" QEMU_STM32_BIN="${QEMU:-}" \
     "$VENV/bin/python" -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ) > "$LOGS/backend.log" 2>&1 &
 BACKEND_PID=$!
@@ -444,7 +492,7 @@ printf '  Application: http://localhost:5173\n'
 printf '  Backend API: http://localhost:8001/api/docs\n'
 printf '  API health:  http://localhost:8001/health\n'
 printf '  Logs:        %s\n' "$LOGS"
-printf '  STM32 QEMU:  %s\n' "$QEMU"
+printf '  STM32 engine: %s\n' "$STM32_ENGINE"
 printf '  Compiler:    %s\n' "$COMPILER"
 printf '  Stop:        Ctrl+C\n\n'
 
