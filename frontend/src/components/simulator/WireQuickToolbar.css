@@ -1,0 +1,92 @@
+.wire-quick-toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 105;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: calc(100% - 24px);
+  padding: 7px 10px;
+  border: 1px solid var(--wb-7);
+  border-radius: 12px;
+  background: var(--wb-2);
+  box-shadow: var(--shadow-2);
+  color: var(--wb-13);
+  pointer-events: auto;
+}
+
+.wire-quick-toolbar-wiring {
+  bottom: 62px;
+}
+
+.wire-quick-toolbar button {
+  min-height: 29px;
+  min-width: 31px;
+  padding: 4px 8px;
+  border: 1px solid var(--wb-6);
+  border-radius: 7px;
+  color: inherit;
+  background: var(--wb-4);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wire-quick-toolbar button:hover,
+.wire-quick-toolbar button:focus-visible {
+  background: var(--wb-5);
+  border-color: var(--wb-9);
+}
+
+.wire-quick-heading {
+  font-size: 11px;
+  color: var(--wb-11);
+  margin: 0 4px;
+}
+
+.wire-quick-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--wb-7);
+  margin: 0 3px;
+}
+
+.wire-quick-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 5px;
+  border-left: 1px solid var(--wb-7);
+  font-size: 11px;
+}
+
+.wire-quick-edit input {
+  width: 100px;
+  min-height: 28px;
+  box-sizing: border-box;
+  border: 1px solid var(--wb-8);
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: var(--wb-1);
+  color: var(--wb-13);
+  font: 12px monospace;
+}
+
+@media (max-width: 700px) {
+  .wire-quick-toolbar {
+    max-height: 132px;
+    overflow-y: auto;
+    bottom: 10px;
+    gap: 4px;
+  }
+  .wire-quick-toolbar-wiring {
+    bottom: 60px;
+  }
+  .wire-quick-heading {
+    display: none;
+  }
+}
