@@ -64,6 +64,13 @@ SHARED_PATHS=(
   "$HOME_DIR/Library/Caches/platformio"
 )
 
+for path in "${SHARED_PATHS[@]}"; do
+  if [[ "$ROOT/" == "$path/"* ]]; then
+    printf '[velxio] Refusing cleanup: the checkout is inside a toolchain directory (%s)\n' "$path" >&2
+    exit 1
+  fi
+done
+
 printf '\n[velxio] Cleanup mode: %s\n' "$MODE"
 printf '[velxio] Repository: %s\n' "$ROOT"
 printf '\nLocal build environments and generated files:\n'
