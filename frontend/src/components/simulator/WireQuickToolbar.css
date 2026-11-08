@@ -90,3 +90,5 @@
     display: none;
   }
 }
+
+.wire-quick-error { color: #fb7185; font-size: 11px; max-width: 190px; white-space: normal; }
