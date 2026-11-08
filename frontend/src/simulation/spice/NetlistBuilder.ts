@@ -19,6 +19,7 @@
 import { UnionFind } from './unionFind';
 import { componentToSpice } from './componentToSpice';
 import { auxRailNetName, isAuxRailNet } from './boardPinGroups';
+import { NET_TERMINAL_PIN, terminalName, terminalRail } from '../../data/netTerminals';
 import { hasInternalNets, breadboardGroupKey } from '../../utils/breadboardNets';
 import type { BuildNetlistInput, ComponentForSpice, BoardForSpice, WireForSpice } from './types';
 
@@ -152,6 +153,27 @@ export function buildNetlist(input: BuildNetlistInput): BuildNetlistResult {
   // Aux rails actually referenced by this circuit: net name → volts. Used to
   // emit one ideal source per aux rail in step 6.
   const auxRailVolts = new Map<string, number>();
+  const namedNets = new Map<string, string>();
+  for (const component of components) {
+    const name = terminalName(component);
+    if (!name) continue;
+    const pin = pinKey(component.id, NET_TERMINAL_PIN);
+    uf.add(pin);
+    const previous = namedNets.get(name);
+    if (previous) uf.union(previous, pin);
+    else namedNets.set(name, pin);
+    const rail = terminalRail(name);
+    if (rail === 'ground') {
+      uf.setCanonical(pin, '0');
+    } else if (rail === 'vcc') {
+      uf.setCanonical(pin, 'vcc_rail');
+    } else if (typeof rail === 'number') {
+      const net = auxRailNetName(rail);
+      uf.setCanonical(pin, net);
+      auxRailVolts.set(net, rail);
+    }
+  }
+
   for (const board of boards) {
     const auxNet = board.auxVolts !== undefined ? auxRailNetName(board.auxVolts) : null;
     const auxPins = new Set(auxNet ? (board.auxPinNames ?? []) : []);
@@ -359,6 +381,13 @@ export function buildNetlist(input: BuildNetlistInput): BuildNetlistResult {
   // to component subscribers downstream of active devices. Legacy ADC
   // injection still works — it only looks up board-prefixed keys.
   const pinNetMap = new Map<string, string>();
+  for (const component of components) {
+    const name = terminalName(component);
+    if (!name) continue;
+    const key = pinKey(component.id, NET_TERMINAL_PIN);
+    const net = netNames.get(uf.find(key));
+    if (net) pinNetMap.set(key, net);
+  }
   for (const w of wires) {
     for (const endpoint of [w.start, w.end]) {
       const key = pinKey(endpoint.componentId, endpoint.pinName);
