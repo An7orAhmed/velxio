@@ -27,7 +27,7 @@ from app.core.hooks import (
 from app.services import build_queue
 from app.services import espidf_compiler as espidf_compiler_module
 from app.services.arduino_cli import ArduinoCLIService
-from app.services.platformio_stm32 import compile_stm32
+from app.services.platformio_compiler import compile_with_platformio
 from app.services.espidf_compiler import espidf_compiler
 
 logger = logging.getLogger(__name__)
@@ -960,16 +960,14 @@ async def _run_compile(
             scope=_scope_of(result),
         )
 
-    if (
-        request.board_fqbn.startswith("STMicroelectronics:stm32:")
-        and os.environ.get("VELXIO_STM32_COMPILER", "arduino").lower() == "platformio"
-    ):
-        result = await compile_stm32(files, request.board_fqbn)
+    if os.environ.get("VELXIO_COMPILER", "arduino").lower() == "platformio":
+        result = await compile_with_platformio(files, request.board_fqbn)
         return CompileResponse(
             success=result["success"],
             hex_content=result.get("hex_content"),
             binary_content=result.get("binary_content"),
             binary_type=result.get("binary_type"),
+            uf2_content=result.get("uf2_content"),
             stdout=result.get("stdout", ""),
             stderr=result.get("stderr", ""),
             error=result.get("error"),
