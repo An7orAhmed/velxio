@@ -43,7 +43,10 @@ BOARD_IDS = {
 def select_board(fqbn):
   if fqbn in BOARD_IDS:
     return BOARD_IDS[fqbn]
-  return BOARD_IDS.get(fqbn.split(":", 3)[0]) if ":" not in fqbn else None
+  for name, board in BOARD_IDS.items():
+    if fqbn.startswith(name + ":"):
+      return board
+  return None
 
 
 def find_platformio():
@@ -115,9 +118,24 @@ def make_flash_image(build_dir, board_id):
       bootloader = candidates[0]
 
   if not bootloader.is_file():
+    root = Path(os.environ.get("PLATFORMIO_CORE_DIR", "~/.platformio")).expanduser()
+    framework = root / "packages" / "framework-arduinoespressif32"
+    chip = "esp32c3" if "c3" in board_id else ("esp32s3" if "s3" in board_id else "esp32")
+    names = (
+      f"tools/sdk/{chip}/bin/bootloader_dio_40m.bin",
+      f"tools/sdk/{chip}/bin/bootloader_qio_80m.bin",
+      f"tools/sdk/{chip}/bin/bootloader_qio_40m.bin",
+    )
+    for name in names:
+      candidate = framework / name
+      if candidate.is_file():
+        bootloader = candidate
+        break
+
+  if not bootloader.is_file():
     raise ValueError(
-      "PlatformIO did not generate bootloader.bin. A complete ESP32 flash image "
-      "is required by the Velxio emulator; use Arduino CLI for this board"
+      "PlatformIO did not provide a compatible ESP32 bootloader. "
+      "A complete flash image is required by the Velxio simulator"
     )
 
   boot_offset = 0 if "c3" in board_id else 0x1000
