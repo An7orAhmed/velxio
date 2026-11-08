@@ -17,6 +17,8 @@
 import { useSimulatorStore } from '../../store/useSimulatorStore';
 import { PinManager } from '../PinManager';
 import { resetBusNets } from '../customChips/busNets';
+import { NET_TERMINAL_IDS, terminalName } from '../../data/netTerminals';
+import { virtualNamedWires } from '../../utils/virtualNamedWires';
 import {
   buildDigitalNetwork,
   digitalGatesEnabled,
@@ -42,7 +44,8 @@ export function mountDigitalGateEngine(): () => void {
   let raf = 0;
 
   const sigOf = (st = useSimulatorStore.getState()) =>
-    st.components.map((c) => c.id).join(',') + '|' + st.wires.length;
+    st.components.map((c) => c.id + ':' + (terminalName(c) ?? '')).join(',') + '|' +
+    st.wires.map((wire) => wire.id + ':' + wire.start.componentId + ':' + wire.end.componentId).join(',');
 
   const paint = () => {
     if (!net?.ok) return;
@@ -63,9 +66,11 @@ export function mountDigitalGateEngine(): () => void {
   const rebuild = () => {
     const st = useSimulatorStore.getState();
     structuralSig = sigOf(st);
-    if (!isAllDigital(st.components as never[])) { net = null; return; }
+    const digitalParts = st.components.filter((component) => !NET_TERMINAL_IDS.has(component.metadataId));
+    if (!isAllDigital(digitalParts as never[])) { net = null; return; }
     resetBusNets();
-    const built = buildDigitalNetwork(st.components as never[], st.wires as never[], new PinManager());
+    const wires = [...st.wires, ...virtualNamedWires(st.components, st.wires)];
+    const built = buildDigitalNetwork(digitalParts as never[], wires as never[], new PinManager());
     net = built.ok ? built : null;
     schedulePaint();
   };
