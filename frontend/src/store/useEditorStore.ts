@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { generateUUID } from '../utils/uuid';
 import { isPiBoardKind } from '../types/board';
 import { getProBoard } from '../lib/proBoardRegistry';
+import { platformIOExampleFiles, platformIOTarget, platformIOSelected } from '../utils/platformioProject';
 
 export interface WorkspaceFile {
   id: string;
@@ -107,12 +108,13 @@ except KeyboardInterrupt:
     GPIO.cleanup()
 `;
 
-const DEFAULT_FILE: WorkspaceFile = {
-  id: MAIN_ID,
-  name: 'sketch.ino',
-  content: DEFAULT_INO_CONTENT,
-  modified: false,
-};
+const DEFAULT_FILES: WorkspaceFile[] = platformIOExampleFiles('arduino-uno', DEFAULT_INO_CONTENT)
+  .map((file, index) => ({
+    id: index === 0 ? MAIN_ID : 'initial-platformio-' + index,
+    name: file.name,
+    content: file.content,
+    modified: false,
+  }));
 
 /** Default file group for the initial Arduino Uno board */
 const DEFAULT_GROUP_ID = 'group-arduino-uno';
@@ -240,7 +242,7 @@ interface EditorState {
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  files: [DEFAULT_FILE],
+  files: DEFAULT_FILES,
   activeFileId: MAIN_ID,
   openFileIds: [MAIN_ID],
   manifestViewBoardId: null,
@@ -254,7 +256,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // File groups — initial state has one group for the default Arduino Uno board
   fileGroups: {
-    [DEFAULT_GROUP_ID]: [DEFAULT_FILE],
+    [DEFAULT_GROUP_ID]: DEFAULT_FILES,
   },
   folderGroups: {},
   activeGroupId: DEFAULT_GROUP_ID,
@@ -528,7 +530,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           fileName = 'sketch.ino';
           content = DEFAULT_INO_CONTENT;
         }
-        files = [{ id: mainId, name: fileName, content, modified: false }];
+        const kind = platformIOTarget(boardIdPart)
+          ? boardIdPart
+          : boardIdPart.replace(/-\d+$/, '');
+        const selectedFiles = platformIOSelected() && platformIOTarget(kind) &&
+          languageMode !== 'micropython' && languageMode !== 'espidf'
+          ? platformIOExampleFiles(kind, content)
+          : [{ name: fileName, content }];
+        files = selectedFiles.map((file, index) => ({
+          id: index === 0 ? mainId : generateUUID(),
+          name: file.name,
+          content: file.content,
+          modified: false,
+        }));
       }
 
       const firstId = files[0]?.id ?? `${groupId}-main`;
