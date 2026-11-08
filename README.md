@@ -30,6 +30,23 @@ The launcher checks Node.js, npm, Python, Arduino CLI and QEMU, installs missing
 - PlatformIO compiler routing covers mapped Arduino AVR, ATtiny85, Raspberry Pi Pico, ESP32, ESP32-S3, ESP32-C3 and STM32 boards. The existing pure ESP-IDF compiler path is retained. Unmapped boards report a clear error rather than silently falling back to Arduino CLI.
 - In PlatformIO mode, the Pico W currently builds with the Pico board definition and does not provide WiFi firmware support. ESP32 simulation requires a bootloader and partitions image, so the compiler rejects an incomplete image instead of claiming it can run.
 - Compiler choice is made when the backend starts. Restart with the other `--compiler` option to change it.
+
+
+### PlatformIO examples and importing firmware projects
+
+Start Velxio with `./run.sh --compiler platformio`. The frontend and backend use this mode together. For supported Arduino framework boards, a gallery example opens as a native PlatformIO workspace with `src/main.cpp` and `platformio.ini` rather than `sketch.ino`. New board workspaces also use the PlatformIO layout. The generated INI selects the matching board and includes gallery library requirements in `lib_deps`.
+
+You can import an existing PlatformIO project in either of these ways:
+
+- **Open project / Import project:** Choose a `.zip` archive containing `platformio.ini` at its root or inside one top-level project folder. Velxio distinguishes it from a Wokwi ZIP.
+- **File menu → Import PlatformIO folder:** Choose the original project directory on your computer. The browser uploads the text source files.
+
+The importer keeps `platformio.ini`, `src/`, `include/` and `lib/` subdirectories and opens them in the normal file tree. Imported INI settings, dependencies and C++/C source paths are retained during PlatformIO compilation, including a matching custom environment name. It refuses environments targeting a different MCU or build platform. To protect the local builder from direct execution of arbitrary imported scripts, `extra_scripts`, `extra_configs` and `platform_packages` are not supported.
+
+The supported board mappings cover Arduino AVR, Raspberry Pi Pico, ESP32 and a range of STM32 boards. Unmapped boards cannot be simulated and are rejected with an explanation instead of being silently changed. Importing works while Arduino CLI is selected, but building the imported project requires restarting in PlatformIO mode.
+
+After importing, the usual **Save project** or **Export .vlx** workflows preserve the workspace files for reopening. Non-text binary assets and generated output directories such as `.pio/` are intentionally excluded from browser import. Existing MicroPython examples and pure ESP-IDF mode are not converted to Arduino framework projects. PlatformIO still needs to download its platform packages and compilers on first use, and a successful firmware build does not guarantee that its hardware peripherals are emulated.
+
 - Set `VELXIO_SKIP_CORES=1` to skip Arduino core downloads.
 - Set `VELXIO_INSTALL_PICO=1` to install the optional RP2040 core.
 - Stop the servers with Ctrl+C. Logs are stored in `.run/logs/`.
