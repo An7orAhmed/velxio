@@ -1,75 +1,54 @@
-# Local STM32 QEMU experiment
+# Local STM32 simulation
 
-This fork contains an opt-in STM32 test backend built around the independent, open-source QEMU ARM system emulator. It does not include Velxio's private STM32 manager, licensed binaries, or hosted authentication.
+Velxio has two independent, opt-in STM32 firmware runners. Neither uses the original commercial STM32 service.
 
-## Scope
+## The onboard LED and why a successful build was not blinking
 
-The first experiment accepts the existing \`stm32-blackpill-f401\` board and boots ELF, raw BIN, or Intel HEX firmware using QEMU's \`olimex-stm32-h405\` machine. This is an STM32F405 approximation, not an STM32F401 emulator. Serial output is forwarded to Velxio's Serial Monitor. GPIO, ADC, I2C, SPI, TIM1, DMA, PWM, and analog interactions are not connected to the circuit canvas.
+The original QEMU runner uses the `olimex-stm32-h405` machine. It models an STM32F405 rather than the selected STM32F401CE, and QEMU has no STM32 GPIO controller. The firmware may compile and start without providing any pin-state events. The onboard LED therefore stays unchanged, even when `digitalWrite(LED_BUILTIN, ...)` executes in the firmware.
 
-STM32F401RCT6 is not the STM32F401CE on the Black Pill. Its pin count, Flash size and peripheral setup can differ. Inverter firmware relying on precise complementary TIM1 PWM, dead time, DMA and clock configuration cannot be validated with this approximation.
+The new experimental Renode runner loads the PlatformIO-generated ELF on Renode's STM32F4 model. It observes GPIO ODR and BSRR register writes, converts them into linear pin numbers and publishes `gpio_change` events through the existing WebSocket bridge. The Black Pill's onboard LED is on PC13, active low, mapped to linear pin 45.
 
-## Local setup
+This uses real MCU register writes from emulated firmware, not a hardcoded timer animation. The user LED can only blink if the firmware boots, writes PC13 and Renode runs its supported peripherals successfully.
 
-On macOS:
+## Run
 
-~~~sh
-brew install qemu
-qemu-system-arm -machine help | grep olimex-stm32-h405
-~~~
-
-On Ubuntu:
+On macOS, the following command selects the Renode engine automatically, and installs Renode using its official Homebrew tap if necessary:
 
 ~~~sh
-sudo apt-get update
-sudo apt-get install qemu-system-arm
-qemu-system-arm -machine help | grep olimex-stm32-h405
+git switch dev
+git pull origin dev
+./run.sh --compiler platformio
 ~~~
 
-The QEMU package must provide the \`olimex-stm32-h405\` machine. If it does not, use an independently built QEMU version that does. The runtime executable is resolved from \`QEMU_STM32_BIN\`, or from \`qemu-system-arm\` in \`PATH\`.
-
-Start the backend from the repository:
+The explicit engine selection is:
 
 ~~~sh
-git checkout experiment/stm32-local-qemu
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-VELXIO_LOCAL_STM32=1 uvicorn app.main:app --host 127.0.0.1 --port 8001
+./run.sh --compiler platformio --stm32-engine renode
 ~~~
 
-In another terminal:
+To use the old UART-only QEMU approximation:
 
 ~~~sh
-cd frontend
-npm install
-npm run dev
+./run.sh --compiler platformio --stm32-engine qemu
 ~~~
 
-Open the local Vite URL, add the STM32F401 Black Pill, load firmware, and run it.
+On Linux, Renode must be installed separately; the default STM32 runner remains QEMU. Set `VELXIO_RENODE_BIN` to an executable path if Renode is not on your PATH. PlatformIO compilation can work without Renode, but the STM32 canvas LED cannot be driven by QEMU.
 
-If \`qemu-system-arm\` is outside \`PATH\`, start the backend with \`QEMU_STM32_BIN=/absolute/path/to/qemu-system-arm\`.
+## Supported firmware and accuracy
 
-For a local firmware test, prefer an ARM ELF file. A raw BIN also works when it is linked for the flash address expected by the emulated board. Intel HEX files are converted into a flash-aligned BIN image automatically. You can also convert one manually using:
+Renode currently supports the `stm32-blackpill-f401` Velxio board only. Use the matching PlatformIO `blackpill_f401ce` environment. It expects an ARM ELF with Flash segments linked at the normal STM32 Flash address; PlatformIO's `firmware.elf` is used automatically when you click Compile.
 
-~~~sh
-arm-none-eabi-objcopy -I ihex -O binary firmware.hex firmware.bin
-~~~
+Renode's STM32F4 CPU, SysTick and GPIO models are not an exact simulation of the STM32F401CE. UART data and input peripherals are not yet wired to this experimental engine. ADC, timers, DMA, PWM, interrupt timing, frequency accuracy and external circuits need separate tests.
+
+The STM32F401RCT6 is a different package/board from the STM32F401CEU6. In particular, this simulator is NOT suitable for validating high power inverter PWM complementary outputs, dead time, shoot-through protection or current limiting.
 
 ## Tests
 
 ~~~sh
 cd backend
-python -m unittest tests.test_local_stm32 -v
+python -m unittest tests.test_local_stm32 tests.test_local_stm32_renode -v
 ~~~
 
-The unit tests exercise the backend protocol, Intel HEX parsing and process lifecycle with a mock QEMU process. They do not prove a real STM32 firmware boots, or that peripheral timings match hardware.
+The unit tests verify firmware decoding, runner lifecycle, Renode script generation and GPIO output event parsing for PC13. They do not replace a real end-to-end firmware test in Renode.
 
-## Follow-up experiments
-
-1. Run a Cortex-M4 ELF with simple UART output and inspect QEMU startup logs.
-2. Check firmware clock initialization against the F405 model.
-3. Implement a freely licensed GPIO event bridge and test PA0, PB0 and PC13.
-4. Add timing and peripheral fidelity tests before making claims about inverter PWM.
-
-The code is covered by Velxio's AGPLv3 terms. This branch is intended for local experimentation and has no connection to the upstream commercial runtime.
+Project source is covered by Velxio's AGPLv3 terms.
