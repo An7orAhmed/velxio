@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import configparser
 import os
 import shutil
 import subprocess
@@ -56,6 +57,32 @@ def find_platformio():
   return shutil.which("pio") or shutil.which("platformio") or ""
 
 
+def choose_environment(config, board):
+  parser = configparser.ConfigParser(interpolation=None)
+  parser.read_string(config)
+  candidates = [section for section in parser.sections() if section.startswith("env:")]
+  if not candidates:
+    raise ValueError("platformio.ini must define an [env:...] environment")
+
+  defaults = parser.get("platformio", "default_envs", fallback="").split()
+  if defaults:
+    candidates.sort(key=lambda section: section[4:] not in defaults)
+
+  for section in candidates:
+    configured_board = parser.get(section, "board", fallback="").strip()
+    if configured_board == board.board:
+      return section[4:]
+
+  available = ", ".join(
+    f"{section[4:]} ({parser.get(section, 'board', fallback='unknown board')})"
+    for section in candidates
+  )
+  raise ValueError(
+    f"platformio.ini has no environment targeting {board.board}. "
+    f"Available environments: {available}"
+  )
+
+
 def prepare_project(directory, files, board):
   project = Path(directory)
   src = project / "src"
@@ -63,46 +90,59 @@ def prepare_project(directory, files, board):
   src.mkdir(parents=True, exist_ok=True)
   include.mkdir(parents=True, exist_ok=True)
 
-  (project / "platformio.ini").write_text(
-    f"[env:{board.board}]\n"
-    f"platform = {board.platform}\n"
-    f"board = {board.board}\n"
-    "framework = arduino\n"
-    "build_type = release\n",
-    encoding="utf-8",
-  )
+  configuration = next((file.get("content", "") for file in files if file.get("name") == "platformio.ini"), None)
+  if configuration is not None:
+    environment = choose_environment(configuration, board)
+  else:
+    environment = board.board
+    configuration = (
+      f"[env:{board.board}]\n"
+      f"platform = {board.platform}\n"
+      f"board = {board.board}\n"
+      "framework = arduino\n"
+      "build_type = release\n"
+    )
 
+  (project / "platformio.ini").write_text(configuration, encoding="utf-8")
   has_sources = False
   for entry in files:
     name = str(entry.get("name") or "").replace("\\", "/")
     if not name or name.startswith("/") or ":" in name or ".." in name.split("/"):
       raise ValueError(f"Unsafe source filename: {name!r}")
-    original = Path(name)
-    suffix = original.suffix.lower()
-    if suffix not in (".ino", ".cpp", ".cc", ".c", ".h", ".hpp"):
+    if name == "platformio.ini":
       continue
 
-    parts = original.parts
-    if parts[0] in ("src", "include"):
-      parts = parts[1:]
-    if not parts:
-      raise ValueError("A source filename is required")
+    original = Path(name)
+    suffix = original.suffix.lower()
+    allowed = {
+      ".ino", ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp",
+      ".s", ".asm", ".ld", ".ini", ".txt", ".json", ".py", ".md",
+    }
+    if suffix not in allowed:
+      continue
 
-    filename = Path(*parts)
-    if filename.suffix.lower() in (".h", ".hpp"):
-      destination = include / filename
+    if name.startswith(("src/", "include/", "lib/", "test/")):
+      destination = project / original
+    elif configuration is not None and any(name.startswith(prefix) for prefix in ("data/", "boards/", "scripts/")):
+      destination = project / original
+    elif suffix in (".h", ".hpp"):
+      destination = include / original
     else:
-      destination = src / filename
-      has_sources = True
+      destination = src / original
+
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(str(entry.get("content") or ""), encoding="utf-8")
+    if destination.is_relative_to(src) and suffix in (".ino", ".cpp", ".cc", ".cxx", ".c"):
+      has_sources = True
 
   if not has_sources:
-    raise ValueError("No compilable Arduino or C/C++ source files")
+    raise ValueError("No compilable Arduino or C/C++ source files were found under src/")
 
   sketch = src / "sketch.ino"
   if sketch.is_file() and not (src / "main.ino").exists():
     sketch.rename(src / "main.ino")
+
+  return environment
 
 
 def make_flash_image(build_dir, board_id):
@@ -209,10 +249,10 @@ async def compile_with_platformio(files, board_fqbn):
 
   try:
     with tempfile.TemporaryDirectory(prefix="velxio-pio-") as directory:
-      prepare_project(directory, files, board)
+      environment = prepare_project(directory, files, board)
       result = await asyncio.to_thread(
         subprocess.run,
-        [executable, "run", "--project-dir", directory, "--environment", board.board],
+        [executable, "run", "--project-dir", directory, "--environment", environment],
         capture_output=True,
         text=True,
         timeout=900,
@@ -227,7 +267,7 @@ async def compile_with_platformio(files, board_fqbn):
           "error": f"PlatformIO build failed for {board.board}",
         }
 
-      artifact_dir = Path(directory) / ".pio" / "build" / board.board
+      artifact_dir = Path(directory) / ".pio" / "build" / environment
       try:
         firmware = firmware_result(artifact_dir, board)
       except ValueError as error:
