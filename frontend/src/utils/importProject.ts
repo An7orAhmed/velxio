@@ -22,6 +22,7 @@
 import { importVlxFile, VlxParseError } from './vlxFile';
 import { importFromWokwiZip } from './wokwiZip';
 import type { ImportResult } from './wokwiZip';
+import { importPlatformIOZip, type PlatformIOImport } from './platformioProject';
 
 /**
  * Common result shape: `kind` tells callers which path ran, so they can
@@ -30,6 +31,7 @@ import type { ImportResult } from './wokwiZip';
  */
 export type ProjectImportResult =
   | { kind: 'vlx' }
+  | PlatformIOImport
   // Derived from ImportResult rather than restated. The zip branch used to
   // hand-copy a four-literal board union that the importer also declared, so
   // the two could disagree — and widening one without the other is a compile
@@ -63,13 +65,15 @@ export async function importProjectFile(file: File): Promise<ProjectImportResult
   }
 
   if (lower.endsWith('.zip')) {
+    const platformio = await importPlatformIOZip(file);
+    if (platformio) return platformio;
     const result = await importFromWokwiZip(file);
     return { kind: 'zip', ...result };
   }
 
   throw new Error(
     `Unsupported project file: ${file.name}.\n` +
-      `Velxio accepts .vlx (Velxio projects) and .zip (Wokwi bundles).`,
+      `Velxio accepts .vlx projects and .zip Wokwi or PlatformIO projects.`,
   );
 }
 
