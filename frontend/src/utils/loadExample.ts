@@ -4,6 +4,7 @@
  */
 
 import type { ExampleProject } from '../data/examples';
+import { platformIOExampleFiles, platformIOSelected } from './platformioProject';
 import type { BoardKind } from '../types/board';
 import { isPiBoardKind } from '../types/board';
 import { useEditorStore, chipFileGroupId, CHIP_GROUP_PREFIX } from '../store/useEditorStore';
@@ -132,7 +133,7 @@ export async function loadExample(
   // OSS self-host (or a deployment whose seed failed) installs on load, as
   // it always did. That call is the only thing that installs an example's
   // libraries there, so it must never be removed outright.
-  if (example.libraries && example.libraries.length > 0) {
+  if (!platformIOSelected() && example.libraries && example.libraries.length > 0) {
     if (!(await serverProvidesGalleryLibraries())) {
       await ensureLibraries(example.libraries, onLibraryProgress);
     }
@@ -192,14 +193,22 @@ export async function loadExample(
         // entry is the main/active file — the example must lead with the
         // sketch so compile picks it up.
         useEditorStore.getState().setActiveGroup(board.activeFileGroupId);
-        useEditorStore.getState().loadFiles(eb.files);
+        useEditorStore.getState().loadFiles(
+          example.languageMode === 'micropython' || example.languageMode === 'espidf' || isPiBoardKind(eb.boardKind)
+            ? eb.files
+            : platformIOExampleFiles(eb.boardKind, eb.code ?? '', eb.files, example.libraries),
+        );
       } else if (eb.code) {
         // Arduino-style boards (AVR, RP2040, ESP32, …) all need the `.ino`
         // extension so arduino-cli auto-includes <Arduino.h>. Only the Pi 3B
         // uses a different toolchain (Python via VFS or g++ for `.cpp`).
         const filename = isPiBoardKind(eb.boardKind) ? 'main.cpp' : 'sketch.ino';
         useEditorStore.getState().setActiveGroup(board.activeFileGroupId);
-        useEditorStore.getState().loadFiles([{ name: filename, content: eb.code }]);
+        useEditorStore.getState().loadFiles(
+          example.languageMode === 'micropython' || example.languageMode === 'espidf' || isPiBoardKind(eb.boardKind)
+            ? [{ name: filename, content: eb.code }]
+            : platformIOExampleFiles(eb.boardKind, eb.code, undefined, example.libraries),
+        );
       }
 
       // Built-in SD slot uploads (XIAO Sense): land on the board exactly as
@@ -352,7 +361,11 @@ export async function loadExample(
       const groupId = updatedBoard?.activeFileGroupId ?? liveBoard.activeFileGroupId;
       editorStore.setActiveGroup(groupId);
       if (boardOwnedFiles.length > 0) {
-        editorStore.loadFiles(boardOwnedFiles);
+        editorStore.loadFiles(
+          example.languageMode === 'micropython' || example.languageMode === 'espidf' || isPiBoardKind(liveBoard.boardKind)
+            ? boardOwnedFiles
+            : platformIOExampleFiles(liveBoard.boardKind, example.code, boardOwnedFiles, example.libraries),
+        );
       } else {
         // The name must match the mode the board was just switched into:
         // MicroPython pastes main.py, ESP-IDF builds main.c — a bare `code:`
@@ -364,7 +377,11 @@ export async function loadExample(
             : example.languageMode === 'espidf'
               ? 'main.c'
               : 'sketch.ino';
-        editorStore.loadFiles([{ name: filename, content: example.code }]);
+        editorStore.loadFiles(
+          example.languageMode === 'micropython' || example.languageMode === 'espidf' || isPiBoardKind(liveBoard.boardKind)
+            ? [{ name: filename, content: example.code }]
+            : platformIOExampleFiles(liveBoard.boardKind, example.code, undefined, example.libraries),
+        );
       }
     } else if (chipGroupIds.length > 0) {
       // Board-less custom-chip example. The chip's program IS the only code
