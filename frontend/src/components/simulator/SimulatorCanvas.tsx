@@ -36,6 +36,7 @@ import { ComponentCameraToggles } from './ComponentCameraToggles';
 import { WireLayer } from './WireLayer';
 import type { SegmentHandle, WaypointHandle, AlignmentGuide } from './WireLayer';
 import { ElectricalOverlay } from '../analog-ui/ElectricalOverlay';
+import { ElectricalStatusBadge } from '../analog-ui/ElectricalStatusBadge';
 import { BoardOnCanvas } from './BoardOnCanvas';
 import { boardSize, normalizeRotation } from '../../utils/boardGeometry';
 import { BoardDock } from './BoardDock';
@@ -3463,6 +3464,8 @@ export const SimulatorCanvas = ({ headerSlot }: SimulatorCanvasProps = {}) => {
                 />
               );
             })()}
+
+          <ElectricalStatusBadge />
 
           {/* Infinite world — pan+zoom applied here */}
           <div
