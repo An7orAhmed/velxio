@@ -7,6 +7,7 @@
 import { traceBoardGpio, traceDetailed, type TraceState } from '../PinTrace';
 import { SYNTHETIC_CHIP_PIN_BASE } from '../customChips/syntheticPins';
 import { boardPinToNumber } from '../../utils/boardPinMapping';
+import { virtualNamedWires } from '../../utils/virtualNamedWires';
 import type { NetResolver, PinRef, ResolvedPin } from './types';
 
 /** Ground or supply, from a board pad name. Anything else (RESET, EN) is neither. */
@@ -27,7 +28,7 @@ function padEndpoints(
   const kind = state.boards.find((b) => b.id === boardId)?.boardKind;
   if (!kind) return [];
   const out: Array<{ componentId: string; pinName: string }> = [];
-  for (const w of state.wires) {
+  for (const w of [...state.wires, ...virtualNamedWires(state.components, state.wires)]) {
     for (const [self, other] of [
       [w.start, w.end],
       [w.end, w.start],
