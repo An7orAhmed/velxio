@@ -83,6 +83,27 @@ class PlatformIOCompilerTests(unittest.TestCase):
           {"name": "src/main.cpp", "content": "int main() { return 0; }"},
         ], PlatformIOBoard("ststm32", "blackpill_f401ce", "stm32"))
 
+  def test_imported_extra_scripts_are_rejected(self):
+    config = (
+      "[env:controller]\nplatform = ststm32\nboard = blackpill_f401ce\n"
+      "framework = arduino\nextra_scripts = post:custom.py\n"
+    )
+    with tempfile.TemporaryDirectory() as root:
+      with self.assertRaisesRegex(ValueError, "Unsupported executable PlatformIO setting"):
+        prepare_project(root, [
+          {"name": "platformio.ini", "content": config},
+          {"name": "src/main.cpp", "content": "void setup() {}"},
+        ], PlatformIOBoard("ststm32", "blackpill_f401ce", "stm32"))
+
+  def test_imported_board_requires_correct_platform(self):
+    config = "[env:controller]\nplatform = espressif32\nboard = blackpill_f401ce\n"
+    with tempfile.TemporaryDirectory() as root:
+      with self.assertRaisesRegex(ValueError, "must use platform ststm32"):
+        prepare_project(root, [
+          {"name": "platformio.ini", "content": config},
+          {"name": "src/main.cpp", "content": "void setup() {}"},
+        ], PlatformIOBoard("ststm32", "blackpill_f401ce", "stm32"))
+
   def test_invalid_filename_is_rejected(self):
     with tempfile.TemporaryDirectory() as root:
       with self.assertRaisesRegex(ValueError, "Unsafe"):
