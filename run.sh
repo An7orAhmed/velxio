@@ -12,6 +12,16 @@ mkdir -p "$BIN" "$LOGS"
 export PATH="$BIN:/opt/homebrew/bin:/usr/local/bin:$PATH"
 cd "$ROOT"
 
+if [[ "$#" -gt 0 ]]; then
+  if [[ "$#" -ne 1 ]] || [[ "$1" != "--repair" ]]; then
+    printf 'Usage: ./run.sh [--repair]\n' >&2
+    exit 2
+  fi
+  printf '[velxio] Rebuilding local development dependencies\n'
+  rm -rf "$VENV" "$ROOT/node_modules" "$ROOT/frontend/node_modules" "$STATE/tooling"
+  rm -f "$STATE/python.sha256" "$STATE/root.sha256" "$STATE/frontend.sha256"
+fi
+
 log() { printf '\n[velxio] %s\n' "$*"; }
 warn() { printf '\n[velxio] WARNING: %s\n' "$*" >&2; }
 fail() { printf '\n[velxio] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -210,6 +220,9 @@ ensure_python_deps() {
   if [[ ! -x "$VENV/bin/python" ]] ||
     ! "$VENV/bin/python" -c 'import fastapi,uvicorn,pydantic_settings,mcp,esptool,wasmtime,zstandard' >/dev/null 2>&1; then
     rm -f "$marker"
+  fi
+  if [[ -d "$VENV" ]] && [[ ! -x "$VENV/bin/python" ]]; then
+    rm -rf "$VENV"
   fi
   if [[ ! -d "$VENV" ]]; then
     log "Creating Python virtual environment"
