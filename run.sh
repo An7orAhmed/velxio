@@ -84,7 +84,7 @@ if [[ "$DRY_RUN" == "1" ]]; then
 fi
 
 if [[ -z "$STM32_ENGINE" ]]; then
-  if [[ "$COMPILER" == "platformio" ]]; then
+  if [[ "$COMPILER" == "platformio" ]] && [[ "$(uname -s)" == "Darwin" ]]; then
     STM32_ENGINE="renode"
   else
     STM32_ENGINE="qemu"
