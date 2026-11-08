@@ -25,6 +25,11 @@ The launcher checks Node.js, npm, Python, Arduino CLI and QEMU, installs missing
 - The launcher checks that `STMicroelectronics:stm32` is installed before starting. Installation errors stop startup instead of allowing broken firmware compilation.
 - If the STM32 ARM compiler download fails with a transient HTTP 504, the launcher retries the core install, then downloads the official xPack compiler with curl resume support, verifies its SHA256 against the Arduino board index, stages it in Arduino CLI's own package cache, and retries the installation. It cannot repair a persistent outage at the official download host.
 - If RP2040 support is needed, run `VELXIO_INSTALL_PICO=1 ./run.sh`. If the RP2040 index fails, STM32 installation is retried independently.
+- Choose the compiler for **all Arduino framework boards** with `./run.sh --compiler arduino` or `./run.sh --compiler platformio`. Arduino CLI remains the default.
+- In PlatformIO mode, the launcher detects an existing `pio` command or installs it inside `backend/.venv`. It skips Arduino board indexes and cores, avoiding the failing STM32duino GCC download. PlatformIO downloads its own required frameworks and toolchains the first time each board is compiled.
+- PlatformIO compiler routing covers mapped Arduino AVR, ATtiny85, Raspberry Pi Pico, ESP32, ESP32-S3, ESP32-C3 and STM32 boards. The existing pure ESP-IDF compiler path is retained. Unmapped boards report a clear error rather than silently falling back to Arduino CLI.
+- In PlatformIO mode, the Pico W currently builds with the Pico board definition and does not provide WiFi firmware support. ESP32 simulation requires a bootloader and partitions image, so the compiler rejects an incomplete image instead of claiming it can run.
+- Compiler choice is made when the backend starts. Restart with the other `--compiler` option to change it.
 - Set `VELXIO_SKIP_CORES=1` to skip Arduino core downloads.
 - Set `VELXIO_INSTALL_PICO=1` to install the optional RP2040 core.
 - Stop the servers with Ctrl+C. Logs are stored in `.run/logs/`.
