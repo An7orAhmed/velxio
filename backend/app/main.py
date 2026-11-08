@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 import asyncio
 from contextlib import asynccontextmanager
@@ -157,7 +158,7 @@ try:
 except ImportError:
     pass
 
-if __import__("os").environ.get("VELXIO_LOCAL_STM32") == "1":
+if os.environ.get("VELXIO_LOCAL_STM32") == "1":
     from app.local_stm32 import register_local_stm32
     register_local_stm32()
 
