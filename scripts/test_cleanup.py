@@ -127,6 +127,15 @@ class CleanupTests(unittest.TestCase):
     self.assertTrue(self.personal.exists())
     self.assertTrue(self.other.exists())
 
+  def test_checkout_nested_inside_toolchain_is_protected(self):
+    nested = self.shared / "velxio"
+    self.repo.rename(nested)
+    self.repo = nested
+    result = self.run_cleanup("tools", dry_run=True)
+    self.assertNotEqual(result.returncode, 0)
+    self.assertIn("checkout is inside a toolchain directory", result.stderr)
+    self.assertTrue(nested.exists())
+
   def test_unknown_checkout_cannot_be_removed(self):
     (self.repo / "backend" / "app" / "main.py").unlink()
     result = self.run_cleanup("all", confirmation="DELETE VELXIO")
