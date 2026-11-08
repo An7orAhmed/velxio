@@ -64,13 +64,25 @@ def choose_environment(config, board):
   if not candidates:
     raise ValueError("platformio.ini must define an [env:...] environment")
 
-  defaults = parser.get("platformio", "default_envs", fallback="").split()
+  defaults = parser.get("platformio", "default_envs", fallback="").replace(",", " ").split()
   if defaults:
     candidates.sort(key=lambda section: section[4:] not in defaults)
 
+  prohibited = {"extra_scripts", "extra_configs", "platform_packages"}
+  for section in parser.sections():
+    blocked = prohibited.intersection(parser.options(section))
+    if blocked:
+      raise ValueError(f"Unsupported executable PlatformIO setting in [{section}]: {', '.join(sorted(blocked))}")
+
+  default_board = parser.get("env", "board", fallback="").strip()
   for section in candidates:
-    configured_board = parser.get(section, "board", fallback="").strip()
+    configured_board = parser.get(section, "board", fallback=default_board).strip()
+    configured_platform = parser.get(section, "platform", fallback=parser.get("env", "platform", fallback="")).strip()
     if configured_board == board.board:
+      if configured_platform.split("@", 1)[0] != board.platform:
+        raise ValueError(
+          f"PlatformIO environment {section} must use platform {board.platform} for board {board.board}"
+        )
       return section[4:]
 
   available = ", ".join(
