@@ -208,8 +208,21 @@ ensure_cores() {
   for core in arduino:avr STMicroelectronics:stm32; do
     if ! arduino-cli core list | grep -q "^$core[[:space:]]"; then
       log "Installing missing Arduino core $core"
-      arduino-cli core install "$core" ||
-        fail "Failed to install $core. Check the Arduino CLI output and retry ./run.sh"
+      if ! arduino-cli core install "$core"; then
+        if [[ "$core" != "STMicroelectronics:stm32" ]]; then
+          fail "Failed to install $core. Check the Arduino CLI output and retry"
+        fi
+
+        warn "STM32 installation failed. Retrying the Arduino CLI download"
+        sleep 5
+        if ! arduino-cli core install "$core"; then
+          log "Attempting to recover the STM32 GCC download from the official xPack release"
+          "$PYTHON" "$ROOT/scripts/stage_stm32_toolchain.py" ||
+            fail "Unable to cache the official STM32 GCC archive. The upstream download may still be unavailable"
+          arduino-cli core install "$core" ||
+            fail "STM32 installation failed after verified toolchain recovery. Check the remaining dependency errors"
+        fi
+      fi
     fi
     if ! arduino-cli core list | grep -q "^$core[[:space:]]"; then
       fail "$core is still missing after setup. Firmware compilation would fail"
