@@ -34,6 +34,12 @@ The launcher checks Node.js, npm, Python, Arduino CLI and QEMU, installs missing
 - Set `VELXIO_INSTALL_PICO=1` to install the optional RP2040 core.
 - Stop the servers with Ctrl+C. Logs are stored in `.run/logs/`.
 
+- Preview toolchain cleanup without deleting anything: `./run.sh --cleanup --dry-run`.
+- Clean project build dependencies and user-level Arduino/PlatformIO toolchain caches: `./run.sh --cleanup`. This includes `.run`, local virtual environments and `node_modules`, `~/Library/Arduino15` on macOS, `~/.arduino15`, and `~/.platformio`. It preserves the source checkout and Git history.
+- Remove the entire local Velxio checkout and those toolchain caches: `./run.sh --cleanup all`. This permanently removes the local repository, including any uncommitted work or untracked files. Preview with `./run.sh --cleanup all --dry-run` first.
+- Both cleanup modes print exactly what they will remove and require a typed confirmation in an interactive terminal. They do not require an installed compiler. The shared caches may be used by other Arduino or PlatformIO projects; the script never deletes your Arduino sketchbook or system-wide tools such as Homebrew, Node.js, Python and QEMU. Globally installed Arduino CLI or PlatformIO executables remain because they may belong to other projects.
+
+
 The local STM32 experiment is automatically enabled by the launcher. It uses an independent QEMU STM32F405 machine as an approximate target for the STM32F401 Black Pill. It does **not** provide accurate STM32F401RCT6, GPIO, ADC, TIM1, DMA or inverter simulation yet. See [the STM32 experiment notes](docs/STM32_LOCAL_EXPERIMENT.md). ESP32 QEMU libraries and ESP-IDF are not automatically installed by this host launcher; see the original Docker setup for those.
 
 ---
