@@ -49,10 +49,6 @@ export function ElectricalOverlay({
   hoveredBoardId = null,
 }: ElectricalOverlayProps = {}) {
   const nodeVoltages = useElectricalStore((s) => s.nodeVoltages);
-  const converged = useElectricalStore((s) => s.converged);
-  const error = useElectricalStore((s) => s.error);
-  const solveMs = useElectricalStore((s) => s.lastSolveMs);
-  const analysisMode = useElectricalStore((s) => s.analysisMode);
   const timeWaveforms = useElectricalStore((s) => s.timeWaveforms);
   const pinNetMap = useElectricalStore((s) => s.pinNetMap);
 
@@ -104,7 +100,6 @@ export function ElectricalOverlay({
     );
   }, [labels, hoveredWireId, hoveredComponentId, hoveredBoardId]);
 
-  const modeBadge = analysisMode === 'tran' ? 'AC' : 'DC';
   // SVG attributes cannot take a CSS custom property, so the overlay resolves
   // its tokens here. `theme` is read purely to re-resolve them when the user
   // switches appearance — cssVar caches per theme.
@@ -113,22 +108,10 @@ export function ElectricalOverlay({
     () => ({
       labelBg: cssVar('--color-canvas-label-bg'),
       dc: cssVar('--color-probe-dc'),
-      dcDim: cssVar('--color-probe-dc-dim'),
       ac: cssVar('--color-probe-ac'),
-      error: cssVar('--color-probe-error'),
-      errorDim: cssVar('--color-probe-error-dim'),
     }),
     [theme],
   );
-  const badgeColor = analysisMode === 'tran' ? probe.ac : probe.dcDim;
-
-  const summaryLines: string[] = [];
-  if (error) summaryLines.push(`Warning: ${error}`);
-  else if (!converged) summaryLines.push('Warning: did not converge');
-  else {
-    const n = Object.keys(nodeVoltages).length;
-    summaryLines.push(`${n} nets | ${solveMs.toFixed(0)} ms`);
-  }
 
   return (
     <svg
@@ -142,51 +125,6 @@ export function ElectricalOverlay({
         zIndex: 20,
       }}
     >
-      {/* Summary pill with AC/DC badge */}
-      <g transform="translate(12, 12)">
-        <rect
-          x={0}
-          y={0}
-          rx={4}
-          ry={4}
-          width={250}
-          height={24}
-          fill={probe.labelBg}
-          stroke={error ? probe.errorDim : badgeColor}
-        />
-        <rect
-          x={4}
-          y={4}
-          rx={2}
-          ry={2}
-          width={22}
-          height={16}
-          fill={badgeColor}
-          opacity={0.2}
-          stroke={badgeColor}
-        />
-        <text
-          x={15}
-          y={16}
-          fontSize={10}
-          fill={badgeColor}
-          fontFamily="monospace"
-          textAnchor="middle"
-          fontWeight="bold"
-        >
-          {modeBadge}
-        </text>
-        <text
-          x={32}
-          y={17}
-          fontSize={11}
-          fill={error ? probe.error : probe.dcDim}
-          fontFamily="monospace"
-        >
-          SPICE {summaryLines.join(' ')}
-        </text>
-      </g>
-
       {/* Per-wire voltage labels — only for what the cursor is on */}
       {visibleLabels.map((l) => (
         <g key={l.id} transform={`translate(${l.x}, ${l.y})`}>
