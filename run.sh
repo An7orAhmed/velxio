@@ -427,7 +427,7 @@ fi
 log "Starting frontend"
 (
   cd "$ROOT/frontend"
-  exec "$NPM" run dev -- --host 127.0.0.1 --port 5173 --strictPort
+  exec env VITE_VELXIO_COMPILER="$COMPILER" "$NPM" run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ) > "$LOGS/frontend.log" 2>&1 &
 FRONTEND_PID=$!
 
