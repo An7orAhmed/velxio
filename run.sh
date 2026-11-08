@@ -8,13 +8,13 @@ LOGS="$STATE/logs"
 VENV="$ROOT/backend/.venv"
 BACKEND_PID=""
 FRONTEND_PID=""
-mkdir -p "$BIN" "$LOGS"
-export PATH="$BIN:/opt/homebrew/bin:/usr/local/bin:$PATH"
-cd "$ROOT"
-
 COMPILER="$(printenv VELXIO_COMPILER 2>/dev/null || printf 'arduino')"
 PIO=""
 REPAIR=0
+CLEANUP_MODE=""
+DRY_RUN=0
+HAS_COMPILER_FLAG=0
+
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --compiler)
@@ -23,23 +23,59 @@ while [[ "$#" -gt 0 ]]; do
         exit 2
       fi
       COMPILER="$2"
+      HAS_COMPILER_FLAG=1
       shift 2
       ;;
     --repair)
       REPAIR=1
       shift
       ;;
+    --cleanup)
+      if [[ -n "$CLEANUP_MODE" ]]; then
+        printf 'Specify --cleanup only once\n' >&2
+        exit 2
+      fi
+      CLEANUP_MODE="tools"
+      if [[ "$#" -gt 1 ]] && [[ "$2" == "all" ]]; then
+        CLEANUP_MODE="all"
+        shift 2
+      else
+        shift
+      fi
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
     *)
       printf 'Usage: ./run.sh [--compiler arduino|platformio] [--repair]\n' >&2
+      printf '       ./run.sh --cleanup [all] [--dry-run]\n' >&2
       exit 2
       ;;
   esac
 done
 
+if [[ -n "$CLEANUP_MODE" ]]; then
+  if [[ "$REPAIR" == "1" ]] || [[ "$HAS_COMPILER_FLAG" == "1" ]]; then
+    printf 'Cleanup cannot be combined with --repair or --compiler\n' >&2
+    exit 2
+  fi
+  exec bash "$ROOT/scripts/cleanup.sh" "$ROOT" "$CLEANUP_MODE" "$DRY_RUN"
+fi
+
+if [[ "$DRY_RUN" == "1" ]]; then
+  printf -- '--dry-run is only available with --cleanup\n' >&2
+  exit 2
+fi
+
 if [[ "$COMPILER" != "arduino" ]] && [[ "$COMPILER" != "platformio" ]]; then
   printf 'Invalid compiler: %s. Choose arduino or platformio\n' "$COMPILER" >&2
   exit 2
 fi
+
+mkdir -p "$BIN" "$LOGS"
+export PATH="$BIN:/opt/homebrew/bin:/usr/local/bin:$PATH"
+cd "$ROOT"
 
 if [[ "$REPAIR" == "1" ]]; then
   printf '[velxio] Rebuilding local development dependencies\n'
