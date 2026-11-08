@@ -40,6 +40,7 @@ import type { CompilationLog, CompileTarget } from '../../utils/compilationLogge
 import { exportToWokwiZip, retargetBoardWires } from '../../utils/wokwiZip';
 import { wifiSsidNoteFor } from '../../utils/firmwareWifiNote';
 import { importProjectFile, PROJECT_FILE_ACCEPT } from '../../utils/importProject';
+import { applyPlatformIOImport } from '../../utils/applyPlatformIOImport';
 import { showMessageDialog } from '../../store/useMessageDialogStore';
 import { readFirmwareFile } from '../../utils/firmwareLoader';
 import {
@@ -1610,6 +1611,14 @@ export const EditorToolbar = ({
       if (result.kind === 'vlx') {
         // importVlxFile already wrote into the stores.
         setMessage({ type: 'success', text: `Imported ${file.name}` });
+        return;
+      }
+      if (result.kind === 'platformio') {
+        applyPlatformIOImport(result);
+        setMessage({ type: 'success', text: `Imported PlatformIO project: ${file.name}` });
+        if (result.warnings.length) {
+          showMessageDialog(result.warnings.join('\n'), { kind: 'info' });
+        }
         return;
       }
       // .zip path: apply the parsed payload to the stores ourselves, then
