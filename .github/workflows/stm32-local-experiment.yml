@@ -16,6 +16,13 @@ on:
       - backend/tests/test_platformio_compiler.py
       - backend/app/api/routes/compile.py
       - backend/app/services/arduino_cli.py
+      - frontend/src/utils/platformioProject.ts
+      - frontend/src/utils/applyPlatformIOImport.ts
+      - frontend/src/utils/importProject.ts
+      - frontend/src/utils/loadExample.ts
+      - frontend/src/components/editor/FileExplorer.tsx
+      - frontend/src/components/editor/EditorToolbar.tsx
+      - frontend/src/__tests__/platformio-project-workspace.test.ts
       - scripts/stage_stm32_toolchain.py
       - scripts/test_stage_stm32_toolchain.py
       - .github/workflows/stm32-local-experiment.yml
@@ -35,3 +42,14 @@ jobs:
       - run: python -m pip install -r backend/requirements.txt
       - run: python -m unittest tests.test_local_stm32 tests.test_platformio_compiler -v
         working-directory: backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run tsc
+        working-directory: frontend
+      - run: npm test -- src/__tests__/platformio-project-workspace.test.ts
+        working-directory: frontend
