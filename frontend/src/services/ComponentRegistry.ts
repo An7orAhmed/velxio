@@ -6,6 +6,7 @@
  */
 
 import { prepareSearchFields, rankBySearch, type PreparedSearchFields } from '../utils/searchMatch';
+import { NET_TERMINAL_METADATA } from '../data/netTerminals';
 import { componentSearchKeywords } from '../data/componentSearchKeywords';
 import type {
   ComponentMetadata,
@@ -222,6 +223,7 @@ export class ComponentRegistry {
         tags: ['custom', 'chip', 'wasm', 'c', 'wokwi', 'eeprom', 'rtc', 'logic', 'cpu', '8080', 'z80'],
       });
 
+      data.components.push(...NET_TERMINAL_METADATA);
       this.processMetadata(data.components);
       this.loaded = true;
 
