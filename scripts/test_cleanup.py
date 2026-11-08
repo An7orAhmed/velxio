@@ -46,8 +46,8 @@ class CleanupTests(unittest.TestCase):
 
   def run_cleanup(self, mode, *, dry_run=False, confirmation=None):
     command = ["bash", str(self.repo / "run.sh"), "--cleanup"]
-    if mode == "all":
-      command.append("all")
+    if mode in ("all", "arduino", "platformio"):
+      command.append(mode)
     if dry_run:
       command.append("--dry-run")
 
@@ -117,6 +117,30 @@ class CleanupTests(unittest.TestCase):
     self.assertTrue((self.repo / ".git").exists())
     self.assertTrue(self.personal.exists())
     self.assertTrue(self.other.exists())
+
+  def test_arduino_cleanup_does_not_remove_platformio(self):
+    result = self.run_cleanup("arduino", confirmation="CLEAN ARDUINO")
+    self.assertEqual(result.returncode, 0, result.stdout)
+    self.assertFalse(self.arduino.exists())
+    self.assertTrue(self.shared.exists())
+    self.assertTrue((self.repo / ".run").exists())
+    self.assertTrue((self.repo / "backend" / ".venv").exists())
+    self.assertTrue(self.repo.exists())
+
+  def test_platformio_cleanup_does_not_remove_arduino(self):
+    result = self.run_cleanup("platformio", confirmation="CLEAN PLATFORMIO")
+    self.assertEqual(result.returncode, 0, result.stdout)
+    self.assertFalse(self.shared.exists())
+    self.assertTrue(self.arduino.exists())
+    self.assertTrue((self.repo / ".run").exists())
+    self.assertTrue((self.repo / "backend" / ".venv").exists())
+    self.assertTrue(self.repo.exists())
+
+  def test_platformio_preview_leaves_both_toolchains(self):
+    result = self.run_cleanup("platformio", dry_run=True)
+    self.assertEqual(result.returncode, 0, result.stderr)
+    self.assertTrue(self.arduino.exists())
+    self.assertTrue(self.shared.exists())
 
   def test_cleanup_all_removes_checkout(self):
     result = self.run_cleanup("all", confirmation="DELETE VELXIO")
