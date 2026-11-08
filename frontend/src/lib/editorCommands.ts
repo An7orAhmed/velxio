@@ -21,6 +21,7 @@ export type EditorCommandId =
   | 'project.save'
   | 'project.open'
   | 'project.import'
+  | 'project.importPlatformioFolder'
   | 'project.export'
   | 'project.exportVlx'
   | 'project.exportBom'
