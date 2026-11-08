@@ -478,6 +478,8 @@ def _job_key(
     # before a sdkconfig change must not be served after it.
     h.update(_TOOLCHAIN_EPOCH.encode())
     h.update(b"\0")
+    h.update(os.environ.get("VELXIO_COMPILER", "arduino").lower().encode())
+    h.update(b"\0")
     h.update(board_fqbn.encode())
     h.update(b"\0")
     for f in sorted(files, key=lambda x: x["name"]):
