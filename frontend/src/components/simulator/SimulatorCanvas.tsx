@@ -1804,6 +1804,27 @@ export const SimulatorCanvas = ({ headerSlot }: SimulatorCanvasProps = {}) => {
     component.properties = { ...component.properties, ...values };
     recordAddComponent(component);
     trackAddComponent(metadata.id);
+    if (wireInProgress) {
+      const pinName = metadataId.startsWith('net-') ? 'NET' : '1';
+      finishWireCreation({
+        componentId: component.id,
+        pinName,
+        x: position.x + 7,
+        y: position.y + 18,
+      });
+      trackCreateWire();
+      const created = useSimulatorStore.getState().wires.at(-1);
+      if (created) {
+        useSimulatorStore.getState().pushCommand(
+          {
+            description: 'Connect quick component',
+            execute: () => useSimulatorStore.getState().addWire(created),
+            undo: () => useSimulatorStore.getState().removeWire(created.id),
+          },
+          { applyNow: false },
+        );
+      }
+    }
     setSelectedComponentId(component.id);
   };
 
