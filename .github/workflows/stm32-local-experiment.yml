@@ -25,6 +25,21 @@ on:
       - frontend/src/components/editor/FileExplorer.tsx
       - frontend/src/components/editor/EditorToolbar.tsx
       - frontend/src/__tests__/platformio-project-workspace.test.ts
+      - frontend/src/data/netTerminals.ts
+      - frontend/src/components/velxio-components/NetTerminalElement.ts
+      - frontend/src/components/simulator/WireQuickToolbar.tsx
+      - frontend/src/components/simulator/WireQuickToolbar.css
+      - frontend/src/components/simulator/SimulatorCanvas.tsx
+      - frontend/src/components/ComponentPickerModal.tsx
+      - frontend/src/services/ComponentRegistry.ts
+      - frontend/src/simulation/spice/NetlistBuilder.ts
+      - frontend/src/simulation/PinTrace.ts
+      - frontend/src/simulation/Interconnect.ts
+      - frontend/src/simulation/buses/storeResolver.ts
+      - frontend/src/simulation/digital/digitalGateController.ts
+      - frontend/src/utils/virtualNamedWires.ts
+      - frontend/src/lib/proBoardGate.ts
+      - frontend/src/__tests__/wiring-quick-tools.test.ts
       - scripts/stage_stm32_toolchain.py
       - scripts/test_stage_stm32_toolchain.py
       - .github/workflows/stm32-local-experiment.yml
@@ -51,5 +66,5 @@ jobs:
         working-directory: frontend
       - run: npm run tsc
         working-directory: frontend
-      - run: npm test -- src/__tests__/platformio-project-workspace.test.ts
+      - run: npm test -- src/__tests__/platformio-project-workspace.test.ts src/__tests__/wiring-quick-tools.test.ts src/__tests__/netlist-builder.test.ts src/__tests__/board-gate-actions.test.ts
         working-directory: frontend
