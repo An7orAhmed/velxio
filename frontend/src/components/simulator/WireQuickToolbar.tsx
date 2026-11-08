@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { parseValueWithUnits } from '../../simulation/spice/valueParser';
 import './WireQuickToolbar.css';
 
 type CustomPart = 'resistor' | 'capacitor' | 'net-label';
@@ -21,10 +22,12 @@ export function WireQuickToolbar({ wiring, onInsert, onOpenPicker }: WireQuickTo
   const [resistance, setResistance] = useState('1k');
   const [capacitance, setCapacitance] = useState('100n');
   const [label, setLabel] = useState('SIGNAL');
+  const [error, setError] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    setError('');
     if (custom) inputRef.current?.focus();
   }, [custom]);
 
@@ -47,7 +50,14 @@ export function WireQuickToolbar({ wiring, onInsert, onOpenPicker }: WireQuickTo
     const value = custom === 'resistor' ? resistance.trim()
       : custom === 'capacitor' ? capacitance.trim()
         : label.trim();
-    if (!value) return;
+    if (!value) {
+      setError('Value is required');
+      return;
+    }
+    if (custom !== 'net-label' && !(parseValueWithUnits(value) > 0)) {
+      setError('Enter a positive value, for example 1k or 100n');
+      return;
+    }
     onInsert(custom, custom === 'net-label' ? { netName: value } : { value });
     setCustom(null);
   };
@@ -111,6 +121,7 @@ export function WireQuickToolbar({ wiring, onInsert, onOpenPicker }: WireQuickTo
           />
           <button type="submit">Add</button>
           <button type="button" aria-label="Cancel quick add" onClick={() => setCustom(null)}>×</button>
+          {error && <span className="wire-quick-error" role="alert">{error}</span>}
         </form>
       )}
     </div>
