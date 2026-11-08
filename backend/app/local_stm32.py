@@ -118,6 +118,7 @@ class LocalSession:
   process: asyncio.subprocess.Process
   firmware_path: pathlib.Path
   callback: EventCallback
+  script_path: pathlib.Path | None = None
   tasks: list[asyncio.Task] = field(default_factory=list)
   stderr_tail: str = ""
 
@@ -235,6 +236,8 @@ class LocalStm32Qemu:
     status = await session.process.wait()
     await asyncio.gather(*session.tasks[:2], return_exceptions=True)
     session.firmware_path.unlink(missing_ok=True)
+    if session.script_path:
+      session.script_path.unlink(missing_ok=True)
     if self.sessions.get(client_id) is session:
       self.sessions.pop(client_id, None)
       reason = session.stderr_tail.strip() or f"QEMU exited with code {status}"
@@ -260,6 +263,8 @@ class LocalStm32Qemu:
         await session.process.wait()
     await asyncio.gather(*session.tasks, return_exceptions=True)
     session.firmware_path.unlink(missing_ok=True)
+    if session.script_path:
+      session.script_path.unlink(missing_ok=True)
 
   async def disconnect(self, client_id: str) -> None:
     await self.stop(client_id)
@@ -267,7 +272,11 @@ class LocalStm32Qemu:
 
 
 def register_local_stm32() -> LocalStm32Qemu:
-  runner = LocalStm32Qemu()
+  if os.environ.get("VELXIO_STM32_ENGINE", "qemu").lower() == "renode":
+    from app.local_stm32_renode import LocalStm32Renode
+    runner = LocalStm32Renode()
+  else:
+    runner = LocalStm32Qemu()
   register_ws_sim_handler(runner.handle)
   register_ws_sim_disconnect(runner.disconnect)
   return runner
