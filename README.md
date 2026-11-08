@@ -40,7 +40,7 @@ The circuit canvas now provides a compact wiring toolbar with custom **R** (resi
 - Net labels have one connection pin. Names are case-insensitive: `SDA` and `sda` are the same electrical net. Matching names are combined when building SPICE netlists and traversing direct board connections, without a long visible wire.
 - `+5V`, `+3.3V`, `+12V`, and `GND` terminals create ideal named supply rails in the electrical solver. These rails are independent of what a physical board can safely tolerate; check pin voltage limits before connecting real hardware.
 - Labels can be renamed from the normal component property dialog. They are saved as ordinary components in `.vlx`.
-- Click a quick tool while wiring to place the part near the current wire endpoint, then click the part's pin to finish the wire.
+- Click a quick tool while a wire is being drawn to place the part near the current endpoint and connect the active wire automatically to its first pin. The connection and component are undoable.
 
 In local PlatformIO mode, the locally runnable **STM32F401 Black Pill** no longer displays a PRO badge. Other unverified boards and genuinely hosted-only parts retain their status. Browser-only parts already registered locally do not show ONLINE advertisement cards.
 
