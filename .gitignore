@@ -199,3 +199,5 @@ backend/.venv/*
 # never land in the OSS repo. (micropython-*.bin are the legitimate OSS firmwares.)
 frontend/public/firmware/esp32*-rom.bin
 frontend/public/firmware/esp32*-drom.bin
+
+.run/
