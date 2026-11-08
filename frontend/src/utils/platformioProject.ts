@@ -133,7 +133,10 @@ export function platformIOBoardFromIni(content: string): string {
   const remainder = content.slice(start);
   const end = remainder.search(/^\s*\[[^\]]+\]/m);
   const envContent = end < 0 ? remainder : remainder.slice(0, end);
-  const base = content.match(/^\s*\[env\]\s*$([\s\S]*?)(?=^\s*\[[^\]]+\]|\s*$)/m)?.[1] ?? '';
+  const baseSection = content.match(/^\s*\[env\]\s*$/m);
+  const following = baseSection ? content.slice(baseSection.index! + baseSection[0].length) : '';
+  const nextSection = following.search(/^\s*\[[^\]]+\]/m);
+  const base = nextSection < 0 ? following : following.slice(0, nextSection);
   const board = envContent.match(/^\s*board\s*=\s*([^\n#;]+)/m)?.[1]?.trim() ??
     base.match(/^\s*board\s*=\s*([^\n#;]+)/m)?.[1]?.trim();
   if (!board) throw new Error('platformio.ini must declare a board in the selected environment.');
