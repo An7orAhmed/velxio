@@ -4,7 +4,7 @@ This fork contains an opt-in STM32 test backend built around the independent, op
 
 ## Scope
 
-The first experiment accepts the existing \`stm32-blackpill-f401\` board and boots ELF or raw BIN firmware using QEMU's \`olimex-stm32-h405\` machine. This is an STM32F405 approximation, not an STM32F401 emulator. Serial output is forwarded to Velxio's Serial Monitor. GPIO, ADC, I2C, SPI, TIM1, DMA, PWM, and analog interactions are not connected to the circuit canvas.
+The first experiment accepts the existing \`stm32-blackpill-f401\` board and boots ELF, raw BIN, or Intel HEX firmware using QEMU's \`olimex-stm32-h405\` machine. This is an STM32F405 approximation, not an STM32F401 emulator. Serial output is forwarded to Velxio's Serial Monitor. GPIO, ADC, I2C, SPI, TIM1, DMA, PWM, and analog interactions are not connected to the circuit canvas.
 
 STM32F401RCT6 is not the STM32F401CE on the Black Pill. Its pin count, Flash size and peripheral setup can differ. Inverter firmware relying on precise complementary TIM1 PWM, dead time, DMA and clock configuration cannot be validated with this approximation.
 
@@ -50,7 +50,7 @@ Open the local Vite URL, add the STM32F401 Black Pill, load firmware, and run it
 
 If \`qemu-system-arm\` is outside \`PATH\`, start the backend with \`QEMU_STM32_BIN=/absolute/path/to/qemu-system-arm\`.
 
-For a local firmware test, prefer an ARM ELF file. A raw BIN also works when it is linked for the flash address expected by the emulated board. Intel HEX is currently rejected with an explicit error. You can convert an Intel HEX file using:
+For a local firmware test, prefer an ARM ELF file. A raw BIN also works when it is linked for the flash address expected by the emulated board. Intel HEX files are converted into a flash-aligned BIN image automatically. You can also convert one manually using:
 
 ~~~sh
 arm-none-eabi-objcopy -I ihex -O binary firmware.hex firmware.bin
@@ -63,7 +63,7 @@ cd backend
 python -m unittest tests.test_local_stm32 -v
 ~~~
 
-The unit tests exercise the backend protocol and process lifecycle with a mock QEMU process. They do not prove a real STM32 firmware boots, or that peripheral timings match hardware.
+The unit tests exercise the backend protocol, Intel HEX parsing and process lifecycle with a mock QEMU process. They do not prove a real STM32 firmware boots, or that peripheral timings match hardware.
 
 ## Follow-up experiments
 
