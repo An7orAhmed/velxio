@@ -133,7 +133,9 @@ export function platformIOBoardFromIni(content: string): string {
   const remainder = content.slice(start);
   const end = remainder.search(/^\s*\[[^\]]+\]/m);
   const envContent = end < 0 ? remainder : remainder.slice(0, end);
-  const board = envContent.match(/^\s*board\s*=\s*([^\n#;]+)/m)?.[1]?.trim();
+  const base = content.match(/^\s*\[env\]\s*$([\s\S]*?)(?=^\s*\[[^\]]+\]|\s*$)/m)?.[1] ?? '';
+  const board = envContent.match(/^\s*board\s*=\s*([^\n#;]+)/m)?.[1]?.trim() ??
+    base.match(/^\s*board\s*=\s*([^\n#;]+)/m)?.[1]?.trim();
   if (!board) throw new Error('platformio.ini must declare a board in the selected environment.');
   return board;
 }
@@ -161,6 +163,7 @@ export function buildPlatformIOImport(
 ): PlatformIOImport {
   const config = findPlatformIOConfig(files);
   const boardType = boardKindForPIO(platformIOBoardFromIni(config));
+  if (!platformIOSelected()) warnings.push('Restart Velxio with ./run.sh --compiler platformio to compile this imported firmware.');
   if (!files.some((file) => /^(src|lib)\/.*\.(c|cc|cpp|cxx|ino)$/i.test(file.name))) {
     throw new Error('No source file found in src/ or lib/.');
   }
