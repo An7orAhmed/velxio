@@ -5,7 +5,7 @@ ROOT="${1:?Repository path is required}"
 MODE="${2:?Cleanup mode is required}"
 DRY_RUN="${3:-0}"
 
-if [[ "$MODE" != "tools" ]] && [[ "$MODE" != "all" ]]; then
+if [[ "$MODE" != "tools" ]] && [[ "$MODE" != "all" ]] && [[ "$MODE" != "arduino" ]] && [[ "$MODE" != "platformio" ]]; then
   printf '[velxio] Unknown cleanup mode: %s\n' "$MODE" >&2
   exit 2
 fi
@@ -53,18 +53,33 @@ PROJECT_PATHS=(
   "$ROOT/backend/.pytest_cache"
 )
 
-SHARED_PATHS=(
+ARDUINO_PATHS=(
   "$HOME_DIR/Library/Arduino15"
   "$HOME_DIR/.arduino15"
-  "$HOME_DIR/.platformio"
   "$HOME_DIR/.cache/arduino"
-  "$HOME_DIR/.cache/platformio"
   "$HOME_DIR/Library/Caches/arduino"
   "$HOME_DIR/Library/Caches/arduino-cli"
+  "$ROOT/.run/bin/arduino-cli"
+)
+
+PLATFORMIO_PATHS=(
+  "$HOME_DIR/.platformio"
+  "$HOME_DIR/.cache/platformio"
   "$HOME_DIR/Library/Caches/platformio"
 )
 
-for path in "${SHARED_PATHS[@]}"; do
+TARGET_PATHS=()
+if [[ "$MODE" == "tools" ]] || [[ "$MODE" == "all" ]]; then
+  TARGET_PATHS+=("${PROJECT_PATHS[@]}")
+fi
+if [[ "$MODE" == "tools" ]] || [[ "$MODE" == "all" ]] || [[ "$MODE" == "arduino" ]]; then
+  TARGET_PATHS+=("${ARDUINO_PATHS[@]}")
+fi
+if [[ "$MODE" == "tools" ]] || [[ "$MODE" == "all" ]] || [[ "$MODE" == "platformio" ]]; then
+  TARGET_PATHS+=("${PLATFORMIO_PATHS[@]}")
+fi
+
+for path in "${TARGET_PATHS[@]}"; do
   if [[ "$ROOT/" == "$path/"* ]]; then
     printf '[velxio] Refusing cleanup: the checkout is inside a toolchain directory (%s)\n' "$path" >&2
     exit 1
@@ -73,29 +88,22 @@ done
 
 printf '\n[velxio] Cleanup mode: %s\n' "$MODE"
 printf '[velxio] Repository: %s\n' "$ROOT"
-printf '\nLocal build environments and generated files:\n'
-
+printf '\nPaths selected for removal:\n'
 found=0
-for path in "${PROJECT_PATHS[@]}"; do
+for path in "${TARGET_PATHS[@]}"; do
   if [[ -e "$path" ]] || [[ -L "$path" ]]; then
     printf '  %s\n' "$path"
     found=1
   fi
 done
-if [[ "$found" == "0" ]]; then
-  printf '  No generated project directories found\n'
+if [[ "$MODE" == "platformio" ]] && [[ -x "$ROOT/backend/.venv/bin/python" ]]; then
+  if "$ROOT/backend/.venv/bin/python" -m pip show platformio >/dev/null 2>&1; then
+    printf '  PlatformIO package inside %s\n' "$ROOT/backend/.venv"
+    found=1
+  fi
 fi
-
-printf '\nShared Arduino and PlatformIO toolchains and download caches:\n'
-found=0
-for path in "${SHARED_PATHS[@]}"; do
-  if [[ -e "$path" ]] || [[ -L "$path" ]]; then
-    printf '  %s\n' "$path"
-    found=1
-  fi
-done
 if [[ "$found" == "0" ]]; then
-  printf '  No shared toolchain directories found\n'
+  printf '  No matching local toolchain directories found\n'
 fi
 
 if [[ "$MODE" == "all" ]]; then
@@ -112,6 +120,7 @@ fi
 
 printf '\nThese toolchain directories may be shared by other Arduino and PlatformIO projects.\n'
 printf 'The cleanup does not delete your Arduino sketches, system-wide Python, Node.js, QEMU, Homebrew, or shared CLI installations.\n'
+printf 'Individual cleanup modes preserve the other toolchain and shared backend dependencies.\n'
 
 if [[ "$DRY_RUN" == "1" ]]; then
   printf '\n[velxio] Dry run complete. Nothing was deleted.\n'
@@ -123,11 +132,12 @@ if [[ ! -t 0 ]]; then
   exit 1
 fi
 
-if [[ "$MODE" == "all" ]]; then
-  phrase="DELETE VELXIO"
-else
-  phrase="CLEAN TOOLCHAINS"
-fi
+case "$MODE" in
+  all) phrase="DELETE VELXIO" ;;
+  arduino) phrase="CLEAN ARDUINO" ;;
+  platformio) phrase="CLEAN PLATFORMIO" ;;
+  *) phrase="CLEAN TOOLCHAINS" ;;
+esac
 
 printf '\nType %s to confirm: ' "$phrase"
 IFS= read -r confirmation || true
@@ -151,11 +161,14 @@ remove_path() {
   rm -rf -- "$path"
 }
 
-for path in "${PROJECT_PATHS[@]}"; do
-  remove_path "$path"
-done
+if [[ "$MODE" == "platformio" ]] && [[ -x "$ROOT/backend/.venv/bin/python" ]]; then
+  if "$ROOT/backend/.venv/bin/python" -m pip show platformio >/dev/null 2>&1; then
+    printf '[velxio] Uninstalling PlatformIO from the Velxio Python environment\n'
+    "$ROOT/backend/.venv/bin/python" -m pip uninstall -y platformio
+  fi
+fi
 
-for path in "${SHARED_PATHS[@]}"; do
+for path in "${TARGET_PATHS[@]}"; do
   remove_path "$path"
 done
 
@@ -165,6 +178,5 @@ if [[ "$MODE" == "all" ]]; then
   rm -rf -- "$ROOT"
   printf '[velxio] Velxio checkout and selected toolchain caches removed.\n'
 else
-  printf '\n[velxio] Arduino/PlatformIO toolchain caches and local build dependencies removed.\n'
-  printf '[velxio] Your Velxio source files and Git history are preserved.\n'
+  printf '\n[velxio] %s cleanup finished. Your Velxio source files and Git history are preserved.\n' "$MODE"
 fi
