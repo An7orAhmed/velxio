@@ -56,8 +56,13 @@ class LocalStm32Tests(unittest.IsolatedAsyncioTestCase):
     elf = b"\x7fELF" + b"\x00" * 16
     self.assertEqual(decode_firmware(base64.b64encode(elf).decode()), (elf, ".elf"))
     self.assertEqual(decode_firmware(base64.b64encode(b"\x01\x02").decode()), (b"\x01\x02", ".bin"))
-    with self.assertRaisesRegex(ValueError, "Intel HEX"):
-      decode_firmware(base64.b64encode(b":02000000ABCD").decode())
+    hex_image = b":020000040800F2\n:0400000000100020CC\n:00000001FF\n"
+    self.assertEqual(
+      decode_firmware(base64.b64encode(hex_image).decode()),
+      (b"\x00\x10\x00\x20", ".bin"),
+    )
+    with self.assertRaisesRegex(ValueError, "checksum"):
+      decode_firmware(base64.b64encode(hex_image.replace(b"20CC", b"20CD")).decode())
     with self.assertRaises(ValueError):
       decode_firmware("invalid==base64")
 
