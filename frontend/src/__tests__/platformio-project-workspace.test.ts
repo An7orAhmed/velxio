@@ -13,6 +13,7 @@ import { useSimulatorStore } from '../store/useSimulatorStore';
 import { loadExample } from '../utils/loadExample';
 import { exampleProjects } from '../data/examples';
 import { applyPlatformIOImport } from '../utils/applyPlatformIOImport';
+import { buildVlxPayload } from '../utils/vlxFile';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -146,5 +147,8 @@ describe('PlatformIO import', () => {
     const workspace = useEditorStore.getState().getGroupFiles(board.activeFileGroupId);
     expect(workspace.map((file) => file.name)).toContain('lib/signal/src/signal.cpp');
     expect(workspace.map((file) => file.name)).toContain('platformio.ini');
+    const saved = buildVlxPayload();
+    expect(saved.fileGroups[board.activeFileGroupId].map((file) => file.name)).toContain('platformio.ini');
+    expect(saved.fileGroups[board.activeFileGroupId].map((file) => file.name)).toContain('lib/signal/src/signal.cpp');
   });
 });
