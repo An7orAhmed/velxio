@@ -7,6 +7,8 @@ on:
   pull_request:
     paths:
       - backend/app/local_stm32.py
+      - backend/app/local_stm32_renode.py
+      - backend/tests/test_local_stm32_renode.py
       - backend/tests/test_local_stm32.py
       - backend/app/main.py
       - run.sh
@@ -40,7 +42,7 @@ jobs:
       - run: python -m unittest discover -s scripts -p 'test_cleanup.py' -v
       - run: python -m unittest discover -s scripts -p 'test_stage_*.py' -v
       - run: python -m pip install -r backend/requirements.txt
-      - run: python -m unittest tests.test_local_stm32 tests.test_platformio_compiler -v
+      - run: python -m unittest tests.test_local_stm32 tests.test_local_stm32_renode tests.test_platformio_compiler -v
         working-directory: backend
       - uses: actions/setup-node@v4
         with:
