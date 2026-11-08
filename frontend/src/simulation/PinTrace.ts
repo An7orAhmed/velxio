@@ -22,6 +22,7 @@ import { isBoardComponent, boardPinToNumber } from '../utils/boardPinMapping';
 import { isBoardSeated } from '../utils/socketSnap';
 import { isActiveDevice } from './PinResolver';
 import { breadboardGroupKey } from '../utils/breadboardNets';
+import { virtualNamedWires } from '../utils/virtualNamedWires';
 import { syntheticChipPin, SYNTHETIC_CHIP_PIN_BASE } from './customChips/syntheticPins';
 import { resolveChipNetKey } from './customChips/chipNets';
 import { isChipLikePad } from './customChips/chipLikePads';
@@ -89,6 +90,23 @@ for (const [preset, base] of Object.entries(PRESET_TO_BASE)) {
 }
 
 export type TraceState = ReturnType<typeof useSimulatorStore.getState>;
+
+const namedWireCache = new WeakMap<object, { components: object; state: TraceState }>();
+
+function traceStateWithLabels(state: TraceState): TraceState {
+  const wiresKey = state.wires as object;
+  const componentsKey = state.components as object;
+  const cached = namedWireCache.get(wiresKey);
+  if (cached?.components === componentsKey) return cached.state;
+
+  const virtual = virtualNamedWires(state.components, state.wires);
+  const result = virtual.length
+    ? { ...state, wires: [...state.wires, ...virtual] }
+    : state;
+  namedWireCache.set(wiresKey, { components: componentsKey, state: result });
+  return result;
+}
+
 
 export interface TraceResult {
   /** >=0 board pin (or a synthetic chip pin), -1 supply/GND pad, null unreached. */
@@ -292,7 +310,7 @@ export function traceDetailed(
   depth = 0,
   activeSeen = false,
 ): TraceResult {
-  return walk(state, fromId, fromPin, depth, activeSeen, new Map(), true, undefined);
+  return walk(traceStateWithLabels(state), fromId, fromPin, depth, activeSeen, new Map(), true, undefined);
 }
 
 /**
@@ -530,7 +548,7 @@ export function traceBoardGpio(
   pinName: string,
   boardId?: string,
 ): number | null {
-  const hit = walk(state, componentId, pinName, 0, false, new Map(), true, boardId);
+  const hit = walk(traceStateWithLabels(state), componentId, pinName, 0, false, new Map(), true, boardId);
   if (hit.arduinoPin === null) return null;
   if (hit.arduinoPin < 0 || hit.arduinoPin >= SYNTHETIC_CHIP_PIN_BASE) return null;
   if (boardId !== undefined && hit.boardId !== undefined && hit.boardId !== boardId) return null;
