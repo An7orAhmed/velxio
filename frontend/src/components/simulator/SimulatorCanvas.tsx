@@ -107,6 +107,7 @@ import {
 } from '../../utils/analytics';
 import { SelectionActionBar } from './SelectionActionBar';
 import { WireModeBanner } from './WireModeBanner';
+import { WireQuickToolbar } from './WireQuickToolbar';
 import { PinPickerDialog } from './PinPickerDialog';
 import { useButtonKeyBindings } from '../../hooks/useButtonKeyBindings';
 import './SimulatorCanvas.css';
@@ -1791,6 +1792,19 @@ export const SimulatorCanvas = ({ headerSlot }: SimulatorCanvasProps = {}) => {
       if (isUserChip) openChipInEditor(component.id);
       else setCustomChipComponentId(component.id);
     }
+  };
+
+  const handleQuickInsert = (metadataId: string, values: Record<string, string> = {}) => {
+    const metadata = registry.getById(metadataId);
+    if (!metadata || interactionRunningRef.current) return;
+    const position = wireInProgress
+      ? { x: wireInProgress.currentX + 32, y: wireInProgress.currentY + 28 }
+      : nextDropSlot();
+    const component = createComponentFromMetadata(metadata, position.x, position.y);
+    component.properties = { ...component.properties, ...values };
+    recordAddComponent(component);
+    trackAddComponent(metadata.id);
+    setSelectedComponentId(component.id);
   };
 
   // Component rotation — applies the new angle and records it as a single
@@ -3535,6 +3549,14 @@ export const SimulatorCanvas = ({ headerSlot }: SimulatorCanvasProps = {}) => {
               hoveredBoardId={hoveredBoardId}
             />
           </div>
+
+          {!interactionRunning && (
+            <WireQuickToolbar
+              wiring={Boolean(wireInProgress)}
+              onInsert={handleQuickInsert}
+              onOpenPicker={() => setShowComponentPicker(true)}
+            />
+          )}
 
           {/* Wire creation mode banner — visible on both desktop and mobile */}
           {wireInProgress && (
