@@ -79,6 +79,9 @@ export type BoardGateVerdict = { decision: 'allow' } | BoardGateBlock;
  * (Zero/1/2/3/4/5; excludes the Pico, which is browser emulation).
  */
 export function isProBoardKind(kind: BoardKind | string): boolean {
+  if (kind === 'stm32-blackpill-f401' && import.meta.env.VITE_VELXIO_COMPILER === 'platformio') {
+    return false;
+  }
   return isStm32BoardKind(kind) || isPiBoardKind(kind);
 }
 
