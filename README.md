@@ -32,6 +32,18 @@ The launcher checks Node.js, npm, Python, Arduino CLI and QEMU, installs missing
 - Compiler choice is made when the backend starts. Restart with the other `--compiler` option to change it.
 
 
+### Quick wiring tools and named nets
+
+The circuit canvas now provides a compact wiring toolbar with custom **R** (resistor), **C** (capacitor), **+5V**, **3V3**, **+12V**, **GND**, **Label**, and **More**.
+
+- Resistor and capacitor values can be entered using engineering prefixes, such as `220`, `4.7k`, or `100n`. Inputs must be positive.
+- Net labels have one connection pin. Names are case-insensitive: `SDA` and `sda` are the same electrical net. Matching names are combined when building SPICE netlists and traversing direct board connections, without a long visible wire.
+- `+5V`, `+3.3V`, `+12V`, and `GND` terminals create ideal named supply rails in the electrical solver. These rails are independent of what a physical board can safely tolerate; check pin voltage limits before connecting real hardware.
+- Labels can be renamed from the normal component property dialog. They are saved as ordinary components in `.vlx`.
+- Click a quick tool while wiring to place the part near the current wire endpoint, then click the part's pin to finish the wire.
+
+In local PlatformIO mode, the locally runnable **STM32F401 Black Pill** no longer displays a PRO badge. Other unverified boards and genuinely hosted-only parts retain their status. Browser-only parts already registered locally do not show ONLINE advertisement cards.
+
 ### PlatformIO examples and importing firmware projects
 
 Start Velxio with `./run.sh --compiler platformio`. The frontend and backend use this mode together. For supported Arduino framework boards, a gallery example opens as a native PlatformIO workspace with `src/main.cpp` and `platformio.ini` rather than `sketch.ino`. New board workspaces also use the PlatformIO layout. The generated INI selects the matching board and includes gallery library requirements in `lib_deps`.
