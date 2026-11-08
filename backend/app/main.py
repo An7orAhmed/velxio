@@ -157,6 +157,11 @@ try:
 except ImportError:
     pass
 
+if __import__("os").environ.get("VELXIO_LOCAL_STM32") == "1":
+    from app.local_stm32 import register_local_stm32
+    register_local_stm32()
+
+
 @app.get("/")
 def root():
     return {
