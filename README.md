@@ -4,6 +4,31 @@
 
 An open-source multi-board emulator and circuit simulator. Write Arduino C++, MicroPython, ESP-IDF or Python, compile it, and run it against real CPU emulation with 150+ interactive electronic components — all in your browser.
 
+## Development in this fork
+
+This fork develops on the [dev branch](https://github.com/An7orAhmed/velxio/tree/dev). The `master` branch is kept stable.
+
+Clone `dev` and run the automatic local launcher on macOS or apt-based Linux:
+
+```bash
+git clone --branch dev https://github.com/An7orAhmed/velxio.git
+cd velxio
+./run.sh
+```
+
+The launcher checks Node.js, npm, Python, Arduino CLI and QEMU, installs missing tools using the local package manager, installs Python and npm dependencies, and starts the backend and frontend.
+
+- Local application: http://localhost:5173
+- Backend API documentation: http://localhost:8001/api/docs
+- Run `./run.sh --repair` to rebuild local Python and npm dependencies.
+- Set `VELXIO_SKIP_CORES=1` to skip Arduino core downloads.
+- Set `VELXIO_INSTALL_PICO=1` to install the optional RP2040 core.
+- Stop the servers with Ctrl+C. Logs are stored in `.run/logs/`.
+
+The local STM32 experiment is automatically enabled by the launcher. It uses an independent QEMU STM32F405 machine as an approximate target for the STM32F401 Black Pill. It does **not** provide accurate STM32F401RCT6, GPIO, ADC, TIM1, DMA or inverter simulation yet. See [the STM32 experiment notes](docs/STM32_LOCAL_EXPERIMENT.md). ESP32 QEMU libraries and ESP-IDF are not automatically installed by this host launcher; see the original Docker setup for those.
+
+---
+
 **40 boards &middot; 5 CPU families**: AVR8 (ATmega / ATtiny), ARM Cortex-M (RP2040 / RP2350 / STM32), Xtensa LX6/LX7 (ESP32 / ESP32-S3), RISC-V (ESP32-C3 / ESP32-C6) and ARM Cortex-A Linux (Raspberry Pi Zero to 5).
 
 ![Visitors](https://visitor-badge.laobi.icu/badge?page_id=davidmonterocrespo24/velxio)
